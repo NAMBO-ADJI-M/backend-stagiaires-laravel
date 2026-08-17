@@ -1,15 +1,16 @@
-#!/bin/sh
 set -e
 
-# Régénère le certificat CA MySQL à chaque démarrage (storage/certs/ est gitignored)
+echo "===> [DEBUG] Préparation certificat SSL MySQL"
 mkdir -p storage/certs
 if [ -n "$MYSQL_CA_CERT" ]; then
   echo "$MYSQL_CA_CERT" > storage/certs/aiven-ca.pem
   chmod 644 storage/certs/aiven-ca.pem
+  echo "===> [DEBUG] Certificat écrit — taille : $(wc -c < storage/certs/aiven-ca.pem) octets"
+  head -1 storage/certs/aiven-ca.pem
 else
-  echo "⚠️  MYSQL_CA_CERT n'est pas défini — la connexion SSL à MySQL va échouer"
+  echo "===> [DEBUG] ⚠️  MYSQL_CA_CERT est VIDE ou absent"
 fi
-
+echo "===> [DEBUG] Fin bloc certificat"
 # ... reste du script existant
 echo "===> Démarrage Laravel"
 
