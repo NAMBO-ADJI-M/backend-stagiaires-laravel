@@ -15,8 +15,9 @@ class Message extends Model
     protected $fillable = ['trajet_id', 'auteur_id', 'contenu', 'lu'];
  
     protected $casts = [
-        'lu' => 'boolean',
-    ];
+    'lu' => 'boolean',
+    'date_envoi' => 'datetime',
+];
  
     public function trajet()
     {
