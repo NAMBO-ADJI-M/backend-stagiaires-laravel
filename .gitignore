@@ -20,7 +20,7 @@
 /public/storage
 /storage/*.key
 /storage/pail
-/storage/certs/
+/storage/certs/*
 !/storage/certs/aiven-ca.pem
 /vendor
 _ide_helper.php

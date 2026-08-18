@@ -1,5 +1,7 @@
 set -e
 
+cd /var/www/html
+
 echo "===> [DEBUG] Préparation certificat SSL MySQL"
 mkdir -p storage/certs
 if [ -n "$MYSQL_CA_CERT" ]; then
@@ -11,10 +13,8 @@ else
   echo "===> [DEBUG] ⚠️  MYSQL_CA_CERT est VIDE ou absent"
 fi
 echo "===> [DEBUG] Fin bloc certificat"
-# ... reste du script existant
-echo "===> Démarrage Laravel"
 
-cd /var/www/html
+echo "===> Démarrage Laravel"
 
 # S'assurer qu'un fichier .env existe
 if [ ! -f .env ]; then
