@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Stagiaire;
 use App\Models\CodeConfirmationStagiaire;
+use App\Mail\VerificationCodeMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 
 class AuthStagiaireController extends Controller
 {
@@ -22,8 +25,13 @@ class AuthStagiaireController extends Controller
             'date_expiration' => now()->addMinutes(10),
         ]);
 
-        // TODO : brancher l'envoi réel par e-mail (Mail::to(...)->send(...))
-        \Log::info("[DEV] Code généré pour {$request->email} (stagiaire) : {$code}");
+        // Envoi réel par e-mail via Brevo
+        try {
+            Mail::to($request->email)->send(new VerificationCodeMail($code, $request->email));
+            Log::info("Code OTP envoyé avec succès à {$request->email} (stagiaire)");
+        } catch (\Exception $e) {
+            Log::error("❌ ÉCHEC ENVOI EMAIL OTP STAGIAIRE : " . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Un code de confirmation a été envoyé à votre adresse e-mail.',

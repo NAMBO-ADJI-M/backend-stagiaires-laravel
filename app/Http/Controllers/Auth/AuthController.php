@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Stagiaire;
 use App\Models\Entreprise;
 use App\Models\VerificationCode;
+use App\Mail\VerificationCodeMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -467,21 +468,13 @@ class AuthController extends Controller
     private function sendVerificationEmail(string $email, string $code): void
     {
         try {
-            Mail::send('emails.verification', [
-                'code' => $code,
-                'email' => $email
-            ], function ($message) use ($email) {
-                $message->to($email)
-                    ->subject('🔐 Vérifiez votre compte StageLink')
-                    ->from(config('mail.from.address'), config('mail.from.name'));
-            });
-            Log::info("Code OTP envoyé avec succès à : $email");
+            Mail::to($email)->send(new VerificationCodeMail($code, $email));
+            Log::info("Code OTP envoyé avec succès via Brevo à : $email");
         } catch (\Exception $e) {
             // Log l'erreur détaillée pour le diagnostic
             Log::error('❌ ÉCHEC ENVOI EMAIL OTP : ' . $e->getMessage(), [
                 'email' => $email,
-                'trace' => $e->getTraceAsString(),
-                'smtp_host' => config('mail.mailers.smtp.host')
+                'trace' => $e->getTraceAsString()
             ]);
         }
     }
