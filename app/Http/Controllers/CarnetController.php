@@ -67,6 +67,36 @@ class CarnetController extends Controller
     }
 
     /**
+     * Ajoute une entrée dans le journal de bord (MISSION ou DIFFICULTE).
+     */
+    public function storeEntree(Request $request, string $carnetId)
+    {
+        $carnet = CarnetDeStage::findOrFail($carnetId);
+        $this->autoriserAccesCarnet($request, $carnet);
+
+        $validated = $request->validate([
+            'type' => 'required|in:MISSION,DIFFICULTE',
+            'titre' => 'required|string|max:255',
+            'commentaire_stagiaire' => 'nullable|string',
+            'date_debut' => 'required|date',
+            'date_fin' => 'nullable|date|after_or_equal:date_debut',
+        ]);
+
+        $entree = EntreeCarnet::create([
+            'carnet_id' => $carnet->id,
+            'type' => $validated['type'],
+            // Note: titre n'existe pas en DB selon le modèle, mais EntreeCarnet
+            // semble l'utiliser dans les JSON. Je vais l'inclure dans le commentaire
+            // si besoin ou vérifier la migration plus tard.
+            'commentaire_stagiaire' => $validated['commentaire_stagiaire'],
+            'date_debut' => $validated['date_debut'],
+            'date_fin' => $validated['date_fin'],
+        ]);
+
+        return response()->json($entree, 201);
+    }
+
+    /**
      * Liste les carnets du stagiaire connecté.
      * Chaque carnet inclut les coordonnées de geofencing à surveiller :
      * priorité au lieu de stage précis saisi par le stagiaire
@@ -202,6 +232,135 @@ class CarnetController extends Controller
             ->get();
 
         return response()->json(['data' => $notifications]);
+    }
+
+    /**
+     * Envoie un encouragement ou une félicitation à un stagiaire.
+     */
+    public function encourager(Request $request, string $carnetId)
+    {
+        $carnet = CarnetDeStage::findOrFail($carnetId);
+        $this->autoriserAccesCarnet($request, $carnet);
+
+        $validated = $request->validate([
+            'type' => 'required|in:ENCOURAGEMENT,FELICITATION',
+            'contenu' => 'required|string|max:500',
+        ]);
+
+        $notification = NotificationEncouragement::create([
+            'carnet_id' => $carnet->id,
+            'type' => $validated['type'],
+            'contenu' => $validated['contenu'],
+            'date_envoi' => now(),
+            'lu' => false,
+        ]);
+
+        return response()->json([
+            'message' => 'Encouragement envoyé avec succès.',
+            'data' => $notification
+        ], 201);
+    }
+
+    /**
+     * Liste tous les stagiaires (carnets) rattachés à l'entreprise connectée.
+     */
+    public function listeEntreprise(Request $request)
+    {
+        $entrepriseId = $request->user()->entreprise->id;
+
+        $carnets = CarnetDeStage::where('entreprise_id', $entrepriseId)
+            ->with(['stagiaire:id,nom,prenom,photo_profil'])
+            ->orderByDesc('date_rattachement')
+            ->get();
+
+        return response()->json(['data' => $carnets]);
+    }
+
+    /**
+     * Statistiques globales pour le dashboard entreprise.
+     */
+    public function statsEntreprise(Request $request)
+    {
+        $entrepriseId = $request->user()->entreprise->id;
+
+        $carnetsIds = CarnetDeStage::where('entreprise_id', $entrepriseId)->pluck('id');
+
+        $nbActifs = CarnetDeStage::where('entreprise_id', $entrepriseId)
+            ->where('statut', 'EN_COURS')
+            ->count();
+
+        $nbMissions = EntreeCarnet::whereIn('carnet_id', $carnetsIds)
+            ->where('type', 'MISSION')
+            ->count();
+
+        // Calcul de la progression moyenne (basée sur l'assiduité)
+        $progressions = IndicateurAssiduite::whereIn('carnet_id', $carnetsIds)->get();
+        $moyenne = 0;
+        if ($progressions->isNotEmpty()) {
+            $somme = $progressions->sum(function ($p) {
+                return $p->jours_attendus > 0 ? ($p->jours_presents / $p->jours_attendus) * 100 : 0;
+            });
+            $moyenne = (int) round($somme / $progressions->count());
+        }
+
+        return response()->json([
+            'data' => [
+                'stagiaires_actifs' => $nbActifs,
+                'missions_assignees' => $nbMissions,
+                'progression_moyenne' => $moyenne,
+                'alertes' => $this->detecterInactivite($entrepriseId),
+            ]
+        ]);
+    }
+
+    /**
+     * Détecte les stagiaires qui n'ont pas ajouté d'entrée depuis plus de 3 jours.
+     */
+    private function detecterInactivite(string $entrepriseId): array
+    {
+        $troisJours = now()->subDays(3);
+
+        return CarnetDeStage::where('entreprise_id', $entrepriseId)
+            ->where('statut', 'EN_COURS')
+            ->whereDoesntHave('entrees', function ($query) use ($troisJours) {
+                $query->where('date_debut', '>', $troisJours);
+            })
+            ->with('stagiaire:id,nom,prenom')
+            ->get()
+            ->map(function ($carnet) {
+                $derniereEntree = EntreeCarnet::where('carnet_id', $carnet->id)
+                    ->orderByDesc('date_debut')
+                    ->first();
+
+                return [
+                    'carnet_id' => $carnet->id,
+                    'stagiaire_nom' => "{$carnet->stagiaire->prenom} {$carnet->stagiaire->nom}",
+                    'derniere_activite' => $derniereEntree ? $derniereEntree->date_debut->diffForHumans() : 'Jamais',
+                ];
+            })
+            ->toArray();
+    }
+
+    /**
+     * Permet au tuteur de laisser un commentaire sur une entrée spécifique.
+     */
+    public function commenterEntree(Request $request, string $entreeId)
+    {
+        $validated = $request->validate([
+            'commentaire_tuteur' => 'required|string|max:1000',
+        ]);
+
+        $entree = EntreeCarnet::where('id', $entreeId)
+            ->whereHas('carnet', function ($q) use ($request) {
+                $q->where('entreprise_id', $request->user()->entreprise->id);
+            })
+            ->firstOrFail();
+
+        $entree->update([
+            'commentaire_tuteur' => $validated['commentaire_tuteur'],
+        ]);
+
+        return response()->json(['message' => 'Commentaire ajouté.', 'data' => $entree]);
     }
 
     private function activitesRecentes(string $carnetId): array

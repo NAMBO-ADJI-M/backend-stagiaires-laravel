@@ -17,6 +17,7 @@ use App\Http\Controllers\SignalementController;
 use App\Http\Controllers\CritereSavoirEtreController;
 use App\Http\Controllers\EvaluationSavoirEtreController;
 use App\Http\Controllers\BilanReflexifController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TestEmailController;
 
 // ================================================
@@ -50,17 +51,23 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Auth
     Route::post('auth/logout', [AuthController::class, 'logout']);
+    Route::post('auth/delete-account', [AuthController::class, 'deleteAccount']);
     Route::get('auth/profile', [AuthController::class, 'profile']);
+
+    // Photo de profil (commune)
+    Route::post('user/photo', [AuthController::class, 'updatePhotoProfil']);
+    Route::delete('user/photo', [AuthController::class, 'supprimerPhotoProfil']);
+
+    // Notifications
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
 
     // ============================================
     // PROFIL - Complétion
     // ============================================
     Route::middleware('profil:stagiaire')->group(function () {
         Route::post('stagiaire/profil', [AuthController::class, 'completeStagiaireProfile']);
-
-        // Photo de profil
-        Route::post('stagiaire/photo', [AuthController::class, 'updatePhotoProfil']);
-        Route::delete('stagiaire/photo', [AuthController::class, 'supprimerPhotoProfil']);
     });
 
     Route::middleware('profil:entreprise')->group(function () {
@@ -92,6 +99,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/', [CarnetController::class, 'store']);
             Route::get('/', [CarnetController::class, 'index']);
             Route::get('{carnetId}/stats', [CarnetController::class, 'stats']);
+            Route::post('{carnetId}/entrees', [CarnetController::class, 'storeEntree']);
         });
 
         // Journal & encouragements du carnet — le stagiaire doit pouvoir
@@ -171,6 +179,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('criteres-savoir-etre')->group(function () {
             Route::post('/', [CritereSavoirEtreController::class, 'store']);
         });
+
+        // Dashboard & Liste Stagiaires
+        Route::get('stagiaires', [CarnetController::class, 'listeEntreprise']);
+        Route::get('dashboard-stats', [CarnetController::class, 'statsEntreprise']);
+        Route::post('carnets/{carnetId}/encourager', [CarnetController::class, 'encourager']);
+        Route::patch('entrees-carnet/{id}/commentaire', [CarnetController::class, 'commenterEntree']);
 
         // Évaluations savoir-être
         Route::prefix('evaluations-savoir-etre')->group(function () {

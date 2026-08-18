@@ -164,7 +164,29 @@ class AuthController extends Controller
     }
 
     /**
-     * 4️⃣ RENVOYER LE CODE
+     * 4️⃣ SUPPRESSION DE COMPTE
+     */
+    public function deleteAccount(Request $request)
+    {
+        $user = $request->user();
+
+        // Nettoyage des profils associés si nécessaire (ou laisser SoftDeletes gérer)
+        if ($user->role === 'stagiaire') {
+            $user->stagiaire()->delete();
+        } else {
+            $user->entreprise()->delete();
+        }
+
+        $user->tokens()->delete();
+        $user->delete(); // Soft delete grâce au trait SoftDeletes dans le modèle User
+
+        return response()->json([
+            'message' => '✅ Compte supprimé avec succès.'
+        ]);
+    }
+
+    /**
+     * 5️⃣ RENVOYER LE CODE
      */
     public function resendCode(Request $request)
     {
@@ -213,7 +235,8 @@ class AuthController extends Controller
             'profile_status' => $profile,
             'profile_data' => $user->role === 'stagiaire'
                 ? $user->stagiaire
-                : $user->entreprise
+                : $user->entreprise,
+            'notifications_non_lues' => $user->unreadNotifications->count(),
         ]);
     }
 

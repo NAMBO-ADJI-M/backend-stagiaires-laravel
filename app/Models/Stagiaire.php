@@ -45,6 +45,19 @@ class Stagiaire extends Model
         'derniere_connexion' => 'datetime',
     ];
 
+    protected $appends = ['photo_profil_url'];
+
+    public function getPhotoProfilUrlAttribute()
+    {
+        if (!$this->photo_profil) {
+            return null;
+        }
+        if (filter_var($this->photo_profil, FILTER_VALIDATE_URL)) {
+            return $this->photo_profil;
+        }
+        return asset('storage/' . $this->photo_profil);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

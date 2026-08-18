@@ -90,8 +90,8 @@ return new class extends Migration
             $table->index('expires_at');
         });
 
-        // ==================== SESSIONS ====================
-        Schema::create('sessions', function (Blueprint $table) {
+        // ==================== SESSIONS APPLICATIVES (tokens d'auth) ====================
+        Schema::create('user_sessions', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('user_id')->constrained('users')->onDelete('cascade');
             $table->string('token', 500);
@@ -355,7 +355,7 @@ return new class extends Migration
         Schema::dropIfExists('niveaux_formation');
         Schema::dropIfExists('metiers');
         Schema::dropIfExists('domaines_formation');
-        Schema::dropIfExists('sessions');
+        Schema::dropIfExists('user_sessions');
         Schema::dropIfExists('verification_codes');
         Schema::dropIfExists('entreprises');
         Schema::dropIfExists('stagiaires');
