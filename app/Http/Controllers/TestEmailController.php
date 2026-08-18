@@ -3,26 +3,33 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Http\Request;
 
 class TestEmailController extends Controller
 {
-    public function sendTestEmail()
+    public function sendTestEmail(Request $request)
     {
         try {
-            $email = 'votre.email@test.com'; // Remplacez par votre email
+            $email = $request->query('email', 'adjimelinklaanambo@gmail.com');
 
-            Mail::raw('Ceci est un test de Brevo ! 🚀', function ($message) use ($email) {
+            Mail::raw('Ceci est un test de connexion SMTP pour StageLink ! 🚀', function ($message) use ($email) {
                 $message->to($email)
-                        ->subject('Test Brevo - StageLink');
+                        ->subject('Test SMTP - StageLink')
+                        ->from(config('mail.from.address'), config('mail.from.name'));
             });
 
             return response()->json([
-                'message' => 'Email envoyé avec succès !',
-                'to' => $email
+                'status' => 'success',
+                'message' => 'Email de test envoyé avec succès !',
+                'to' => $email,
+                'from' => config('mail.from.address'),
+                'mailer' => config('mail.default')
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'error' => $e->getMessage()
+                'status' => 'error',
+                'message' => $e->getMessage(),
+                'hint' => 'Vérifiez vos identifiants SMTP dans le fichier .env'
             ], 500);
         }
     }

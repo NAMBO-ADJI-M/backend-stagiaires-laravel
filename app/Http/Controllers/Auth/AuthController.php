@@ -473,11 +473,16 @@ class AuthController extends Controller
             ], function ($message) use ($email) {
                 $message->to($email)
                     ->subject('🔐 Vérifiez votre compte StageLink')
-                    ->from('noreply@stagelink.com', 'StageLink');
+                    ->from(config('mail.from.address'), config('mail.from.name'));
             });
+            Log::info("Code OTP envoyé avec succès à : $email");
         } catch (\Exception $e) {
-            // Log l'erreur mais ne bloque pas le processus
-            Log::error('Erreur d\'envoi d\'email: ' . $e->getMessage());
+            // Log l'erreur détaillée pour le diagnostic
+            Log::error('❌ ÉCHEC ENVOI EMAIL OTP : ' . $e->getMessage(), [
+                'email' => $email,
+                'trace' => $e->getTraceAsString(),
+                'smtp_host' => config('mail.mailers.smtp.host')
+            ]);
         }
     }
 
