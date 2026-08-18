@@ -28,6 +28,7 @@ mkdir -p bootstrap/cache
 
 # Droits
 chown -R www-data:www-data storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
 
 # Générer la clé seulement si absente
 if [ -z "$APP_KEY" ]; then
@@ -42,6 +43,10 @@ php artisan view:cache || true
 
 # Migration (ne bloque pas si la DB n'est pas encore prête)
 php artisan migrate --force || true
+
+# Droits (Reinforced just before start)
+chown -R www-data:www-data storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
 
 echo "===> Lancement de Supervisor"
 
