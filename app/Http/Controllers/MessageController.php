@@ -23,9 +23,9 @@ class MessageController extends Controller
                       ->where('statut', 'CONFIRMEE');
             })
             ->with(['conducteur:id,nom,prenom,photo_profil'])
-            // On charge la relation messages triée par date_envoi
+            // On charge la relation messages triée par date_envoi ET son auteur
             ->with(['messages' => function($query) {
-                $query->orderBy('date_envoi', 'desc');
+                $query->with('auteur:id,nom,prenom')->orderBy('date_envoi', 'desc');
             }])
             ->orderByDesc('date_depart')
             ->get();
