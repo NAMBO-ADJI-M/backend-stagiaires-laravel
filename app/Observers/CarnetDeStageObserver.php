@@ -5,13 +5,15 @@ namespace App\Observers;
 use App\Models\CarnetDeStage;
 use App\Models\Competence;
 use App\Models\ProgressionCompetence;
+use App\Models\IndicateurAssiduite;
+use Carbon\Carbon;
 
 class CarnetDeStageObserver
 {
-    // À la création du carnet : initialise une ligne de progression
-    // pour chaque compétence STANDARD du métier choisi (entreprise_id NULL)
+    // À la création du carnet : initialise les statistiques et la progression
     public function created(CarnetDeStage $carnet): void
     {
+        // 1. Initialiser le référentiel de compétences
         $competences = Competence::where('metier_id', $carnet->metier_id)
             ->whereNull('entreprise_id')
             ->get();
@@ -25,27 +27,55 @@ class CarnetDeStageObserver
                 'niveau_auto' => 'NON_ABORDEE',
             ]);
         }
+
+        // 2. Calculer le nombre de jours ouvrés attendus (Lundi au Vendredi)
+        $dateDebut = Carbon::parse($carnet->date_debut);
+        $dateFin = Carbon::parse($carnet->date_fin);
+
+        $joursAttendus = $dateDebut->diffInDaysFiltered(function (Carbon $date) {
+            return !$date->isWeekend();
+        }, $dateFin->addDay()); // addDay car diffInDays est exclusif de la date de fin
+
+        // 3. Initialiser l'indicateur d'assiduité
+        IndicateurAssiduite::create([
+            'carnet_id' => $carnet->id,
+            'jours_presents' => 0,
+            'jours_attendus' => $joursAttendus,
+            'heures_totales_realisees' => 0
+        ]);
     }
 
-    // Au rattachement à une entreprise : ajoute aussi SES compétences spécifiques
+    // Au rattachement à une entreprise ou changement de dates
     public function updated(CarnetDeStage $carnet): void
     {
-        if (!$carnet->wasChanged('entreprise_id') || is_null($carnet->entreprise_id)) {
-            return;
+        // 1. Gérer le rattachement (ajout des compétences spécifiques)
+        if ($carnet->wasChanged('entreprise_id') && !is_null($carnet->entreprise_id)) {
+            $competencesEntreprise = Competence::where('metier_id', $carnet->metier_id)
+                ->where('entreprise_id', $carnet->entreprise_id)
+                ->get();
+
+            foreach ($competencesEntreprise as $competence) {
+                ProgressionCompetence::firstOrCreate([
+                    'carnet_id' => $carnet->id,
+                    'competence_id' => $competence->id,
+                ], [
+                    'heures_cumulees' => 0,
+                    'niveau_auto' => 'NON_ABORDEE',
+                ]);
+            }
         }
 
-        $competencesEntreprise = Competence::where('metier_id', $carnet->metier_id)
-            ->where('entreprise_id', $carnet->entreprise_id)
-            ->get();
+        // 2. Recalculer les jours attendus si les dates changent
+        if ($carnet->wasChanged(['date_debut', 'date_fin'])) {
+            $dateDebut = Carbon::parse($carnet->date_debut);
+            $dateFin = Carbon::parse($carnet->date_fin);
 
-        foreach ($competencesEntreprise as $competence) {
-            ProgressionCompetence::firstOrCreate([
-                'carnet_id' => $carnet->id,
-                'competence_id' => $competence->id,
-            ], [
-                'heures_cumulees' => 0,
-                'niveau_auto' => 'NON_ABORDEE',
-            ]);
+            $joursAttendus = $dateDebut->diffInDaysFiltered(function (Carbon $date) {
+                return !$date->isWeekend();
+            }, $dateFin->addDay());
+
+            IndicateurAssiduite::where('carnet_id', $carnet->id)
+                ->update(['jours_attendus' => $joursAttendus]);
         }
     }
 }
