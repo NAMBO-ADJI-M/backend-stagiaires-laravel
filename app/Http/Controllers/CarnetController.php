@@ -85,9 +85,7 @@ class CarnetController extends Controller
         $entree = EntreeCarnet::create([
             'carnet_id' => $carnet->id,
             'type' => $validated['type'],
-            // Note: titre n'existe pas en DB selon le modèle, mais EntreeCarnet
-            // semble l'utiliser dans les JSON. Je vais l'inclure dans le commentaire
-            // si besoin ou vérifier la migration plus tard.
+            'titre' => $validated['titre'],
             'commentaire_stagiaire' => $validated['commentaire_stagiaire'],
             'date_debut' => $validated['date_debut'],
             'date_fin' => $validated['date_fin'],

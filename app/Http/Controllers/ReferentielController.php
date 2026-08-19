@@ -6,10 +6,39 @@ use App\Models\DomaineFormation;
 use App\Models\Metier;
 use App\Models\NiveauFormation;
 use App\Models\Competence;
+use App\Models\Stagiaire;
 use Illuminate\Http\Request;
 
 class ReferentielController extends Controller
 {
+    /**
+     * Récupère les positions GPS de tous les stagiaires ayant accepté l'entraide.
+     * Utilisé pour la carte globale des stages.
+     */
+    public function carteStages(Request $request)
+    {
+        return Stagiaire::where('autorisation_entraide', true)
+            ->whereNotNull('lieu_stage_lat')
+            ->whereNotNull('lieu_stage_lng')
+            ->get([
+                'id',
+                'prenom',
+                'nom',
+                'ecole',
+                'filiere',
+                'poste_actuel as poste', // Note: poste_actuel n'est pas en base, on va simplifier
+                'lieu_stage_adresse',
+                'lieu_stage_lat',
+                'lieu_stage_lng',
+                'photo_profil'
+            ])
+            ->map(function($s) {
+                // On ajoute l'URL de la photo
+                $s->photo_url = $s->photo_profil_url;
+                return $s;
+            });
+    }
+
     public function domaines()
     {
         return DomaineFormation::orderBy('nom')->get(['id', 'nom']);

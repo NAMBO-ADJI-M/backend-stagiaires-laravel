@@ -18,6 +18,9 @@ class Trajet extends Model
         'depart_lng',
         'arrivee_lat',
         'arrivee_lng',
+        'current_lat',
+        'current_lng',
+        'last_position_update',
         'lieu_depart',
         'lieu_arrivee',
         'date_depart',
@@ -29,10 +32,13 @@ class Trajet extends Model
 
     protected $casts = [
         'date_depart' => 'datetime',
+        'last_position_update' => 'datetime',
         'depart_lat' => 'float',
         'depart_lng' => 'float',
         'arrivee_lat' => 'float',
         'arrivee_lng' => 'float',
+        'current_lat' => 'float',
+        'current_lng' => 'float',
         'tarif' => 'float',
     ];
 

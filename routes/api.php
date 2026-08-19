@@ -82,6 +82,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('metiers', [ReferentielController::class, 'metiers']);
         Route::get('niveaux-formation', [ReferentielController::class, 'niveauxFormation']);
         Route::get('competences', [ReferentielController::class, 'competences']);
+        Route::get('carte-stages', [ReferentielController::class, 'carteStages']);
     });
 
     // ============================================
@@ -136,6 +137,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/', [TrajetController::class, 'store']);
             Route::get('/', [TrajetController::class, 'index']);
             Route::get('mes-trajets', [TrajetController::class, 'mesTrajets']);
+            Route::post('{id}/position', [TrajetController::class, 'updatePosition']);
         });
 
         Route::prefix('reservations')->group(function () {

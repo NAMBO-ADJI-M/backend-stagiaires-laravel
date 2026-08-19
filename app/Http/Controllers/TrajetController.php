@@ -126,6 +126,29 @@ class TrajetController extends Controller
     }
 
     /**
+     * Met à jour la position GPS actuelle du conducteur pour un trajet actif.
+     */
+    public function updatePosition(Request $request, string $id)
+    {
+        $trajet = Trajet::where('id', $id)
+            ->where('conducteur_id', $request->user()->stagiaire->id)
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'lat' => 'required|numeric',
+            'lng' => 'required|numeric',
+        ]);
+
+        $trajet->update([
+            'current_lat' => $validated['lat'],
+            'current_lng' => $validated['lng'],
+            'last_position_update' => now(),
+        ]);
+
+        return response()->json(['status' => 'success']);
+    }
+
+    /**
      * Formate un trajet selon la structure attendue par le frontend
      * (clé "chauffeur" plutôt que "conducteur", passagers en tableau
      * simple si demandé).
@@ -145,6 +168,11 @@ class TrajetController extends Controller
             'tarif' => $trajet->tarif,
             'description' => $trajet->description,
             'statut' => $trajet->statut,
+            'current_pos' => $trajet->current_lat ? [
+                'lat' => $trajet->current_lat,
+                'lng' => $trajet->current_lng,
+                'updated_at' => $trajet->last_position_update?->toIso8601String(),
+            ] : null,
             'chauffeur' => $trajet->conducteur ? [
                 'id' => $trajet->conducteur->id,
                 'nom' => trim($trajet->conducteur->prenom.' '.$trajet->conducteur->nom),
