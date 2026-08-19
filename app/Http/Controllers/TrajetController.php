@@ -3,33 +3,69 @@
 namespace App\Http\Controllers;
 
 use App\Models\Trajet;
+use App\Models\Stagiaire;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class TrajetController extends Controller
 {
     // Proposer un trajet ponctuel en tant que conducteur
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'lieu_depart' => 'required|string|max:255',
-            'lieu_arrivee' => 'required|string|max:255',
-            'depart_lat' => 'nullable|numeric',
-            'depart_lng' => 'nullable|numeric',
-            'arrivee_lat' => 'nullable|numeric',
-            'arrivee_lng' => 'nullable|numeric',
-            'date_depart' => 'required|date',
-            'places_disponibles' => 'required|integer|min:1',
-            'tarif' => 'nullable|numeric|min:0',
-            'description' => 'nullable|string',
-        ]);
+        try {
+            $validated = $request->validate([
+                'lieu_depart' => 'required|string|max:255',
+                'lieu_arrivee' => 'required|string|max:255',
+                'depart_lat' => 'nullable|numeric',
+                'depart_lng' => 'nullable|numeric',
+                'arrivee_lat' => 'nullable|numeric',
+                'arrivee_lng' => 'nullable|numeric',
+                'date_depart' => 'required|date',
+                'places_disponibles' => 'required|integer|min:1',
+                'tarif' => 'nullable|numeric|min:0',
+                'description' => 'nullable|string',
+            ]);
 
-        $trajet = Trajet::create([
-            ...$data,
-            'conducteur_id' => $request->user()->stagiaire->id,
-            'statut' => 'ACTIF',
-        ]);
+            $user = $request->user();
+            $stagiaire = $user->stagiaire;
 
-        return response()->json($trajet, 201);
+            if (!$stagiaire) {
+                // Création de secours du profil stagiaire si manquant
+                $stagiaire = Stagiaire::create([
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'nom' => 'Utilisateur',
+                    'prenom' => 'StageLink',
+                    'profil_complet' => false,
+                ]);
+            }
+
+            $trajet = Trajet::create([
+                'conducteur_id' => $stagiaire->id,
+                'lieu_depart' => $validated['lieu_depart'],
+                'lieu_arrivee' => $validated['lieu_arrivee'],
+                'depart_lat' => $validated['depart_lat'] ?? 0.0,
+                'depart_lng' => $validated['depart_lng'] ?? 0.0,
+                'arrivee_lat' => $validated['arrivee_lat'] ?? 0.0,
+                'arrivee_lng' => $validated['arrivee_lng'] ?? 0.0,
+                'date_depart' => $validated['date_depart'],
+                'places_disponibles' => $validated['places_disponibles'],
+                'tarif' => $validated['tarif'] ?? 0.0,
+                'description' => $validated['description'] ?? '',
+                'statut' => 'ACTIF',
+            ]);
+
+            Log::info("✅ Nouveau trajet créé par stagiaire {$stagiaire->id}");
+
+            return response()->json($trajet, 201);
+        } catch (\Exception $e) {
+            Log::error("❌ Erreur création trajet : " . $e->getMessage());
+            return response()->json([
+                'message' => 'Une erreur est survenue sur le serveur.',
+                'error' => $e->getMessage() // On affiche l'erreur pour le debug
+            ], 500);
+        }
     }
 
     // Liste des trajets disponibles (tous les trajets actifs à venir)
