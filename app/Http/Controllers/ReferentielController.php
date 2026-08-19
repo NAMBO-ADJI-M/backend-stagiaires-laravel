@@ -26,15 +26,15 @@ class ReferentielController extends Controller
                 'nom',
                 'ecole',
                 'filiere',
-                'poste_actuel as poste', // Note: poste_actuel n'est pas en base, on va simplifier
                 'lieu_stage_adresse',
                 'lieu_stage_lat',
                 'lieu_stage_lng',
                 'photo_profil'
             ])
             ->map(function($s) {
-                // On ajoute l'URL de la photo
+                // On ajoute l'URL de la photo et un titre de poste par défaut
                 $s->photo_url = $s->photo_profil_url;
+                $s->poste = "Stagiaire " . ($s->filiere ?? "");
                 return $s;
             });
     }

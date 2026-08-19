@@ -67,4 +67,9 @@ class Trajet extends Model
             'passager_id'  // clé étrangère sur reservations vers stagiaires
         )->where('reservations.statut', 'CONFIRMEE');
     }
+
+    public function messages()
+    {
+        return $this->hasMany(Message::class, 'trajet_id');
+    }
 }
