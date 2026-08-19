@@ -71,8 +71,15 @@ class TrajetController extends Controller
     // Liste des trajets disponibles (tous les trajets actifs à venir)
     public function index(Request $request)
     {
+        // --- Nettoyage automatique des vieux trajets ---
+        // On passe en TERMINE les trajets dont la date de départ est dépassée de plus de 2 heures
+        Trajet::where('statut', 'ACTIF')
+            ->where('date_depart', '<', now()->subHours(2))
+            ->update(['statut' => 'TERMINE']);
+
         $query = Trajet::where('statut', 'ACTIF')
-            ->where('date_depart', '>=', now())
+            // N'affiche que les trajets dont le départ est dans plus de 15 minutes
+            ->where('date_depart', '>', now()->addMinutes(15))
             ->with(['conducteur:id,nom,prenom,photo_profil'])
             ->orderBy('date_depart');
 

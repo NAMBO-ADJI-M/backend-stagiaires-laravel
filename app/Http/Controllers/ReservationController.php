@@ -26,6 +26,14 @@ class ReservationController extends Controller
                 return response()->json(['message' => 'Ce trajet n\'est plus disponible ou est introuvable.'], 404);
             }
 
+            if ($trajet->date_depart->isPast()) {
+                return response()->json(['message' => 'Ce trajet a déjà démarré, vous ne pouvez plus réserver.'], 422);
+            }
+
+            if ($trajet->date_depart->lt(now()->addMinutes(10))) {
+                return response()->json(['message' => 'Trop tard pour réserver ! Ce trajet part dans moins de 10 minutes.'], 422);
+            }
+
             $user = $request->user();
             $stagiaire = $user->stagiaire;
 
