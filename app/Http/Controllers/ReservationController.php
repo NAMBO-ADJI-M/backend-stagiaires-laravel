@@ -4,43 +4,70 @@ namespace App\Http\Controllers;
 
 use App\Models\Trajet;
 use App\Models\Reservation;
+use App\Models\Stagiaire;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class ReservationController extends Controller
 {
     // Réserver une ou plusieurs places sur un trajet (en tant que passager)
     public function store(Request $request, string $trajetId)
     {
-        $data = $request->validate([
-            'nombre_places' => 'nullable|integer|min:1',
-        ]);
-        $placesDemandees = $data['nombre_places'] ?? 1;
-
-        $trajet = Trajet::where('id', $trajetId)->where('statut', 'ACTIF')->firstOrFail();
-
-        if ($trajet->conducteur_id === $request->user()->stagiaire->id) {
-            throw ValidationException::withMessages([
-                'trajet_id' => 'Vous ne pouvez pas réserver votre propre trajet.',
+        try {
+            $data = $request->validate([
+                'nombre_places' => 'nullable|integer|min:1',
             ]);
+            $placesDemandees = $data['nombre_places'] ?? 1;
+
+            $trajet = Trajet::where('id', $trajetId)->where('statut', 'ACTIF')->first();
+
+            if (!$trajet) {
+                return response()->json(['message' => 'Ce trajet n\'est plus disponible ou est introuvable.'], 404);
+            }
+
+            $user = $request->user();
+            $stagiaire = $user->stagiaire;
+
+            if (!$stagiaire) {
+                // Création de secours du profil stagiaire si manquant
+                $stagiaire = Stagiaire::create([
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'nom' => 'Utilisateur',
+                    'prenom' => 'StageLink',
+                    'profil_complet' => false,
+                ]);
+            }
+
+            if ($trajet->conducteur_id === $stagiaire->id) {
+                return response()->json(['message' => 'Vous ne pouvez pas réserver votre propre trajet.'], 422);
+            }
+
+            $placesReservees = Reservation::where('trajet_id', $trajet.id)
+                ->where('statut', 'CONFIRMEE')
+                ->where('passager_id', '!=', $stagiaire->id)
+                ->sum('places');
+
+            if ($placesReservees + $placesDemandees > $trajet->places_disponibles) {
+                return response()->json(['message' => 'Plus assez de places disponibles sur ce trajet.'], 422);
+            }
+
+            $reservation = Reservation::updateOrCreate(
+                ['trajet_id' => $trajet.id, 'passager_id' => $stagiaire->id],
+                ['places' => $placesDemandees, 'statut' => 'CONFIRMEE']
+            );
+
+            Log::info("✅ Réservation confirmée pour stagiaire {$stagiaire->id} sur trajet {$trajet->id}");
+
+            return response()->json($reservation, 201);
+        } catch (\Exception $e) {
+            Log::error("❌ Erreur réservation : " . $e->getMessage());
+            return response()->json([
+                'message' => 'Impossible de finaliser la réservation.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        $placesReservees = Reservation::where('trajet_id', $trajet->id)
-            ->where('statut', 'CONFIRMEE')
-            ->sum('places');
-
-        if ($placesReservees + $placesDemandees > $trajet->places_disponibles) {
-            throw ValidationException::withMessages([
-                'trajet_id' => 'Plus assez de places disponibles sur ce trajet.',
-            ]);
-        }
-
-        $reservation = Reservation::updateOrCreate(
-            ['trajet_id' => $trajet->id, 'passager_id' => $request->user()->stagiaire->id],
-            ['places' => $placesDemandees, 'statut' => 'CONFIRMEE']
-        );
-
-        return response()->json($reservation, 201);
     }
 
     // Annuler sa réservation
