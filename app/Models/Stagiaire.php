@@ -55,7 +55,7 @@ class Stagiaire extends Model
         if (filter_var($this->photo_profil, FILTER_VALIDATE_URL)) {
             return $this->photo_profil;
         }
-        return asset('storage/' . $this->photo_profil);
+        return url('storage/' . $this->photo_profil);
     }
 
     public function user()
