@@ -264,7 +264,12 @@ class AuthController extends Controller
         try {
             $this->sendVerificationEmail($user->email, $code);
         } catch (\Exception $e) {
-            Log::error("❌ Erreur renvoi OTP Brevo à {$user->email}: " . $e->getMessage());        $this->sendVerificationEmail($user->email, $code);
+            Log::error("❌ Erreur renvoi OTP Brevo à {$user->email}: " . $e->getMessage());
+            return response()->json([
+                'message' => '❌ Impossible d\'envoyer le code de vérification par email.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
 
         return response()->json([
             'message' => '📧 Un nouveau code de vérification a été envoyé à votre email',
