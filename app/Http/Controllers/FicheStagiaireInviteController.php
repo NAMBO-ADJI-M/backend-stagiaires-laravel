@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\FicheStagiaireInvite;
+use App\Models\User;
+use App\Mail\InvitationStagiaireMail;
+use App\Notifications\InvitationRattachementNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
 
 class FicheStagiaireInviteController extends Controller
 {
@@ -25,6 +29,25 @@ class FicheStagiaireInviteController extends Controller
             'code_invitation' => $code,
             'date_expiration' => now()->addDays(30),
         ]);
+
+        $entrepriseNom = $request->user()->entreprise->raison_sociale ?? 'Votre entreprise';
+
+        // 1. Envoi par e-mail (Brevo)
+        try {
+            Mail::to($data['email'])->send(new InvitationStagiaireMail(
+                $data['prenom'],
+                $entrepriseNom,
+                $code
+            ));
+        } catch (\Exception $e) {
+            \Log::error("Erreur envoi invitation email : " . $e->getMessage());
+        }
+
+        // 2. Notification in-app si le stagiaire existe déjà
+        $existingUser = User::where('email', $data['email'])->first();
+        if ($existingUser) {
+            $existingUser->notify(new InvitationRattachementNotification($entrepriseNom, $code));
+        }
 
         return response()->json($fiche, 201);
     }
