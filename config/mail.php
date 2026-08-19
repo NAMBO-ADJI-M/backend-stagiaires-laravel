@@ -77,6 +77,9 @@ return [
 
         'brevo' => [
             'transport' => 'brevo',
+            'api_key' => env('BREVO_API_KEY'),
+            'base_uri' => env('BREVO_API_BASE_URI', 'https://api.brevo.com/v3/'),
+            'timeout' => env('BREVO_API_TIMEOUT', 15),
         ],
 
         'array' => [

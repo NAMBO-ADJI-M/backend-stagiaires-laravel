@@ -38,11 +38,28 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $email = $request->email;
+        $email = strtolower(trim($request->email));
         $role = $request->role;
 
         $user = User::where('email', $email)->first();
         $isNewAccount = false;
+
+        // ⚠️ Vérifier si l'utilisateur existe déjà sous un autre rôle ou est inactif
+        if ($user) {
+            if (!$user->is_active) {
+                return response()->json([
+                    'message' => '❌ Ce compte est désactivé. Veuillez contacter l\'administrateur.',
+                    'errors' => ['email' => ['Compte inactif ou désactivé.']]
+                ], 403);
+            }
+
+            if ($user->role !== $role) {
+                return response()->json([
+                    'message' => "❌ Cet email est déjà associé à un compte « {$user->role} ». Veuillez choisir le profil « {$user->role} » pour vous connecter.",
+                    'errors' => ['role' => ["Le profil sélectionné ne correspond pas au compte existant ({$user->role})."]]
+                ], 422);
+            }
+        }
 
         // ✅ SI LE COMPTE N'EXISTE PAS → LE CRÉER
         if (!$user) {
@@ -55,6 +72,7 @@ class AuthController extends Controller
                 // aléatoire technique, jamais communiquée ni vérifiée.
                 'password' => Hash::make(Str::random(40)),
                 'role' => $role,
+                'is_active' => true,
             ]);
 
             // Créer le profil selon le rôle
@@ -79,7 +97,17 @@ class AuthController extends Controller
 
         // ✅ DANS TOUS LES CAS (nouveau compte ou compte existant) → ENVOYER UN CODE
         $code = $this->generateCode($user->email);
-        $this->sendVerificationEmail($user->email, $code);
+
+        try {
+            $this->sendVerificationEmail($user->email, $code);
+        } catch (\Exception $e) {
+            Log::error("❌ Erreur d'envoi OTP Brevo à {$user->email}: " . $e->getMessage());
+            return response()->json([
+                'message' => '❌ Impossible d\'envoyer le code de vérification par email.',
+                'error' => $e->getMessage(),
+                'hint' => 'Vérifiez la configuration Brevo / SMTP dans les variables d\'environnement.'
+            ], 500);
+        }
 
         return response()->json([
             'message' => $isNewAccount
@@ -113,9 +141,12 @@ class AuthController extends Controller
             ], 422);
         }
 
+        $email = strtolower(trim($request->email));
+        $code = trim($request->code);
+
         // Vérifier le code
-        $verification = VerificationCode::where('email', $request->email)
-            ->where('code', $request->code)
+        $verification = VerificationCode::where('email', $email)
+            ->where('code', $code)
             ->where('used', false)
             ->where('expires_at', '>', Carbon::now())
             ->first();
@@ -131,7 +162,11 @@ class AuthController extends Controller
         $verification->update(['used' => true]);
 
         // Activer le compte
-        $user = User::where('email', $request->email)->first();
+        $user = User::where('email', $email)->first();
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur introuvable'], 404);
+        }
+
         $user->update([
             'email_verified_at' => Carbon::now(),
             'last_login_at' => Carbon::now(),
@@ -139,12 +174,20 @@ class AuthController extends Controller
 
         // Générer le token (reste valide jusqu'à déconnexion manuelle)
         $token = $user->createToken('auth-token')->plainTextToken;
+        $profileStatus = $this->getProfileStatus($user);
 
         return response()->json([
             'message' => '✅ Email vérifié avec succès !',
             'data' => [
                 'token' => $token,
-                'user' => $user,
+                'user' => [
+                    'id' => $user->id,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'profil_complet' => $profileStatus['profile_complete'],
+                    'profil_data' => $user->role === 'stagiaire' ? $user->stagiaire : $user->entreprise,
+                ],
+                'profile_status' => $profileStatus,
                 'redirect' => $user->role === 'stagiaire'
                     ? '/stagiaire/dashboard'
                     : '/entreprise/dashboard',
@@ -202,17 +245,31 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $email = strtolower(trim($request->email));
+        $user = User::where('email', $email)->first();
 
-        if ($user->email_verified_at) {
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non trouvé'], 404);
+        }
+
+        if (!$user->is_active) {
             return response()->json([
-                'message' => '✅ Ce compte est déjà vérifié',
-                'verified' => true,
-            ], 422);
+                'message' => '❌ Ce compte est désactivé.',
+                'errors' => ['email' => ['Compte inactif ou désactivé.']]
+            ], 403);
         }
 
         $code = $this->generateCode($user->email);
-        $this->sendVerificationEmail($user->email, $code);
+
+        try {
+            $this->sendVerificationEmail($user->email, $code);
+        } catch (\Exception $e) {
+            Log::error("❌ Erreur renvoi OTP Brevo à {$user->email}: " . $e->getMessage());
+            return response()->json([
+                'message' => '❌ Échec du renvoi du code.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
 
         return response()->json([
             'message' => '📧 Un nouveau code de vérification a été envoyé à votre email',
@@ -441,13 +498,11 @@ class AuthController extends Controller
      */
     private function generateCode(string $email): string
     {
-        // Supprimer les anciens codes non utilisés
-        VerificationCode::where('email', $email)
-            ->where('used', false)
-            ->delete();
+        // Supprimer tous les anciens codes pour cet email (évite l'accumulation)
+        VerificationCode::where('email', $email)->delete();
 
-        // Générer un code à 6 chiffres
-        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        // Générer un code à 6 chiffres entre 100000 et 999999
+        $code = (string) random_int(100000, 999999);
 
         // Sauvegarder le code
         VerificationCode::create([
@@ -471,11 +526,8 @@ class AuthController extends Controller
             Mail::to($email)->send(new VerificationCodeMail($code, $email));
             Log::info("Code OTP envoyé avec succès via Brevo à : $email");
         } catch (\Exception $e) {
-            // Log l'erreur détaillée pour le diagnostic
-            Log::error('❌ ÉCHEC ENVOI EMAIL OTP : ' . $e->getMessage(), [
-                'email' => $email,
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('❌ ÉCHEC ENVOI EMAIL OTP : ' . $e->getMessage());
+            throw $e;
         }
     }
 
