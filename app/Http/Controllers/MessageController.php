@@ -16,22 +16,22 @@ class MessageController extends Controller
     {
         $stagiaireId = $request->user()->stagiaire->id;
 
-        // On récupère les trajets liés à l'utilisateur
+        // Requête optimisée : on récupère les trajets avec leur dernier message en une seule fois
         $trajets = Trajet::where('conducteur_id', $stagiaireId)
             ->orWhereHas('reservations', function ($query) use ($stagiaireId) {
                 $query->where('passager_id', $stagiaireId)
                       ->where('statut', 'CONFIRMEE');
             })
             ->with(['conducteur:id,nom,prenom,photo_profil'])
+            // On charge la relation messages triée par date_envoi
+            ->with(['messages' => function($query) {
+                $query->orderBy('date_envoi', 'desc');
+            }])
             ->orderByDesc('date_depart')
             ->get();
 
         return response()->json($trajets->map(function ($trajet) use ($stagiaireId) {
-            // On cherche le dernier message pour chaque trajet
-            $dernierMessage = Message::where('trajet_id', $trajet->id)
-                ->with('auteur:id,nom,prenom')
-                ->orderByDesc('date_envoi')
-                ->first();
+            $dernierMessage = $trajet->messages->first();
 
             return [
                 'trajet_id' => $trajet->id,
@@ -40,13 +40,13 @@ class MessageController extends Controller
                 'date_depart' => $trajet->date_depart?->toIso8601String(),
                 'dernier_message' => $dernierMessage ? [
                     'contenu' => $dernierMessage->contenu,
-                    'auteur' => $dernierMessage->auteur_id === $stagiaireId ? 'Vous' : $dernierMessage->auteur->prenom,
+                    'auteur' => $dernierMessage->auteur_id === $stagiaireId ? 'Vous' : ($dernierMessage->auteur->prenom ?? 'Utilisateur'),
                     'cree_a' => $dernierMessage->date_envoi?->toIso8601String(),
                 ] : null,
                 'chauffeur' => [
-                    'id' => $trajet->conducteur->id,
-                    'nom' => trim($trajet->conducteur->prenom . ' ' . $trajet->conducteur->nom),
-                    'photo_profil' => $trajet->conducteur->photo_profil,
+                    'id' => $trajet->conducteur->id ?? null,
+                    'nom' => $trajet->conducteur ? trim($trajet->conducteur->prenom . ' ' . $trajet->conducteur->nom) : 'Inconnu',
+                    'photo_profil' => $trajet->conducteur->photo_profil_url ?? null,
                 ],
             ];
         }));
