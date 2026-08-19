@@ -35,6 +35,17 @@ Route::get('/login', function () {
 Route::get('/test-email', [TestEmailController::class, 'sendTestEmail']);
 
 // ================================================
+// RÉFÉRENTIEL (PUBLIC - nécessaire pour les formulaires)
+// ================================================
+Route::prefix('referentiel')->group(function () {
+    Route::get('domaines', [ReferentielController::class, 'domaines']);
+    Route::get('metiers', [ReferentielController::class, 'metiers']);
+    Route::get('niveaux-formation', [ReferentielController::class, 'niveauxFormation']);
+    Route::get('competences', [ReferentielController::class, 'competences']);
+    Route::get('carte-stages', [ReferentielController::class, 'carteStages']);
+});
+
+// ================================================
 // AUTHENTIFICATION UNIFIÉE - PUBLIC
 // ================================================
 Route::prefix('auth')->group(function () {
@@ -72,17 +83,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('profil:entreprise')->group(function () {
         Route::post('entreprise/profil', [AuthController::class, 'completeEntrepriseProfile']);
-    });
-
-    // ============================================
-    // RÉFÉRENTIEL (protégé mais accessible à tous)
-    // ============================================
-    Route::prefix('referentiel')->group(function () {
-        Route::get('domaines', [ReferentielController::class, 'domaines']);
-        Route::get('metiers', [ReferentielController::class, 'metiers']);
-        Route::get('niveaux-formation', [ReferentielController::class, 'niveauxFormation']);
-        Route::get('competences', [ReferentielController::class, 'competences']);
-        Route::get('carte-stages', [ReferentielController::class, 'carteStages']);
     });
 
     // ============================================
