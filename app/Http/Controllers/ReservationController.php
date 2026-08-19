@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Trajet;
 use App\Models\Reservation;
 use App\Models\Stagiaire;
+use App\Notifications\NewReservationNotification;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
@@ -62,9 +63,23 @@ class ReservationController extends Controller
             }
 
             $reservation = Reservation::updateOrCreate(
-                ['trajet_id' => $trajet.id, 'passager_id' => $stagiaire->id],
+                ['trajet_id' => $trajet->id, 'passager_id' => $stagiaire->id],
                 ['places' => $placesDemandees, 'statut' => 'CONFIRMEE']
             );
+
+            // 🔔 Notification au conducteur
+            try {
+                $conducteur = $trajet->conducteur->user;
+                if ($conducteur) {
+                    $conducteur->notify(new \App\Notifications\NewReservationNotification(
+                        $stagiaire->prenom . ' ' . $stagiaire->nom,
+                        $trajet->lieu_arrivee,
+                        $placesDemandees
+                    ));
+                }
+            } catch (\Exception $e) {
+                Log::error("Erreur notification conducteur : " . $e->getMessage());
+            }
 
             Log::info("✅ Réservation confirmée pour stagiaire {$stagiaire->id} sur trajet {$trajet->id}");
 

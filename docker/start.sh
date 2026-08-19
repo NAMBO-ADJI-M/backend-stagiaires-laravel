@@ -36,6 +36,9 @@ if [ -z "$APP_KEY" ]; then
     php artisan key:generate --force
 fi
 
+# Créer le lien symbolique pour le stockage public
+php artisan storage:link --force || true
+
 # Optimisation (ne bloque pas le démarrage)
 php artisan config:cache || true
 php artisan route:cache || true
