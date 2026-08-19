@@ -107,6 +107,12 @@ class CarnetController extends Controller
     {
         $stagiaire = $request->user()->stagiaire;
 
+        if (!$stagiaire) {
+            return response()->json([
+                'data' => [],
+            ]);
+        }
+
         $carnets = CarnetDeStage::where('stagiaire_id', $stagiaire->id)
             ->with('entreprise:id,adresse_lat,adresse_lng,rayon_detection_metres')
             ->orderByDesc('date_creation')

@@ -144,6 +144,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('mes-reservations', [ReservationController::class, 'mesReservations']);
         });
 
+        // Messagerie globale et spécifique
+        Route::get('messages', [MessageController::class, 'conversations']);
         Route::prefix('trajets/{trajetId}/messages')->group(function () {
             Route::post('/', [MessageController::class, 'store']);
             Route::get('/', [MessageController::class, 'index']);

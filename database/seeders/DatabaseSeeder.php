@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
         // ============================================
         $this->call([
             DomainesNiveauxFormationSeeder::class,
+            MetierSeeder::class,
         ]);
 
         // ============================================

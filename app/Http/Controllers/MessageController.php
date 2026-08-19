@@ -8,6 +8,50 @@ use Illuminate\Http\Request;
 
 class MessageController extends Controller
 {
+    /**
+     * Liste des conversations (trajets actifs) de l'utilisateur.
+     * Récupère les trajets où l'utilisateur est soit conducteur, soit passager confirmé.
+     */
+    public function conversations(Request $request)
+    {
+        $stagiaireId = $request->user()->stagiaire->id;
+
+        // On récupère les trajets liés à l'utilisateur
+        $trajets = Trajet::where('conducteur_id', $stagiaireId)
+            ->orWhereHas('reservations', function ($query) use ($stagiaireId) {
+                $query->where('passager_id', $stagiaireId)
+                      ->where('statut', 'CONFIRMEE');
+            })
+            ->with(['conducteur:id,nom,prenom,photo_profil'])
+            ->orderByDesc('date_depart')
+            ->get();
+
+        return response()->json($trajets->map(function ($trajet) use ($stagiaireId) {
+            // On cherche le dernier message pour chaque trajet
+            $dernierMessage = Message::where('trajet_id', $trajet->id)
+                ->with('auteur:id,nom,prenom')
+                ->orderByDesc('date_envoi')
+                ->first();
+
+            return [
+                'trajet_id' => $trajet->id,
+                'lieu_depart' => $trajet->lieu_depart,
+                'lieu_arrivee' => $trajet->lieu_arrivee,
+                'date_depart' => $trajet->date_depart?->toIso8601String(),
+                'dernier_message' => $dernierMessage ? [
+                    'contenu' => $dernierMessage->contenu,
+                    'auteur' => $dernierMessage->auteur_id === $stagiaireId ? 'Vous' : $dernierMessage->auteur->prenom,
+                    'cree_a' => $dernierMessage->date_envoi?->toIso8601String(),
+                ] : null,
+                'chauffeur' => [
+                    'id' => $trajet->conducteur->id,
+                    'nom' => trim($trajet->conducteur->prenom . ' ' . $trajet->conducteur->nom),
+                    'photo_profil' => $trajet->conducteur->photo_profil,
+                ],
+            ];
+        }));
+    }
+
     // Envoyer un message sur un trajet — ouvert dès qu'il est visible, pas besoin de réservation
     public function store(Request $request, string $trajetId)
     {

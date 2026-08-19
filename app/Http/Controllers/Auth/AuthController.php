@@ -264,12 +264,7 @@ class AuthController extends Controller
         try {
             $this->sendVerificationEmail($user->email, $code);
         } catch (\Exception $e) {
-            Log::error("❌ Erreur renvoi OTP Brevo à {$user->email}: " . $e->getMessage());
-            return response()->json([
-                'message' => '❌ Échec du renvoi du code.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+            Log::error("❌ Erreur renvoi OTP Brevo à {$user->email}: " . $e->getMessage());        $this->sendVerificationEmail($user->email, $code);
 
         return response()->json([
             'message' => '📧 Un nouveau code de vérification a été envoyé à votre email',
@@ -286,7 +281,30 @@ class AuthController extends Controller
     public function profile(Request $request)
     {
         $user = $request->user();
+
+        // Auto-création défensive du profil si manquant
+        if ($user->role === 'stagiaire' && !$user->stagiaire) {
+            Stagiaire::create([
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'nom' => 'Utilisateur',
+                'prenom' => 'StageLink',
+                'profil_complet' => false,
+                'carnet_creer' => false,
+            ]);
+            $user->load('stagiaire');
+        } elseif ($user->role === 'entreprise' && !$user->entreprise) {
+            Entreprise::create([
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'raison_sociale' => 'Mon Entreprise',
+                'profil_complet' => false,
+            ]);
+            $user->load('entreprise');
+        }
+
         $profile = $this->getProfileStatus($user);
+        $notifCount = rescue(fn() => $user->unreadNotifications()->count(), 0);
 
         return response()->json([
             'user' => $user,
@@ -294,7 +312,7 @@ class AuthController extends Controller
             'profile_data' => $user->role === 'stagiaire'
                 ? $user->stagiaire
                 : $user->entreprise,
-            'notifications_non_lues' => $user->unreadNotifications->count(),
+            'notifications_non_lues' => $notifCount,
         ]);
     }
 
@@ -526,8 +544,11 @@ class AuthController extends Controller
             Mail::to($email)->send(new VerificationCodeMail($code, $email));
             Log::info("Code OTP envoyé avec succès via Brevo à : $email");
         } catch (\Exception $e) {
-            Log::error('❌ ÉCHEC ENVOI EMAIL OTP : ' . $e->getMessage());
-            throw $e;
+            // Log l'erreur détaillée pour le diagnostic
+            Log::error('❌ ÉCHEC ENVOI EMAIL OTP : ' . $e->getMessage(), [
+                'email' => $email,
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 
