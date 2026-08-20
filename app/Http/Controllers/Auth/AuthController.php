@@ -311,14 +311,34 @@ class AuthController extends Controller
         $profile = $this->getProfileStatus($user);
         $notifCount = rescue(fn() => $user->unreadNotifications()->count(), 0);
 
-        return response()->json([
+        $data = [
             'user' => $user,
             'profile_status' => $profile,
             'profile_data' => $user->role === 'stagiaire'
                 ? $user->stagiaire
                 : $user->entreprise,
             'notifications_non_lues' => $notifCount,
-        ]);
+        ];
+
+        // Pour le stagiaire, on ajoute l'état de l'autorisation pour l'entreprise active
+        if ($user->role === 'stagiaire' && $user->stagiaire) {
+            $carnet = \App\Models\CarnetDeStage::where('stagiaire_id', $user->stagiaire->id)
+                ->where('statut', 'EN_COURS')
+                ->first();
+
+            if ($carnet && $carnet->entreprise_id) {
+                $auto = \App\Models\AutorisationPointage::where('stagiaire_id', $user->stagiaire->id)
+                    ->where('entreprise_id', $carnet->entreprise_id)
+                    ->first();
+                $data['autorisation_pointage'] = [
+                    'entreprise_id' => $carnet->entreprise_id,
+                    'entreprise_nom' => $carnet->entreprise_nom,
+                    'statut' => $auto ? $auto->statut : 'INACTIVE',
+                ];
+            }
+        }
+
+        return response()->json($data);
     }
 
     /**

@@ -275,7 +275,16 @@ class CarnetController extends Controller
         $carnets = CarnetDeStage::where('entreprise_id', $entrepriseId)
             ->with(['stagiaire:id,nom,prenom,photo_profil'])
             ->orderByDesc('date_rattachement')
-            ->get();
+            ->get()
+            ->map(function($carnet) use ($entrepriseId) {
+                // Récupérer le statut de l'autorisation de pointage
+                $autorisation = \App\Models\AutorisationPointage::where('stagiaire_id', $carnet->stagiaire_id)
+                    ->where('entreprise_id', $entrepriseId)
+                    ->first();
+
+                $carnet->autorisation_pointage_statut = $autorisation ? $autorisation->statut : 'INACTIVE';
+                return $carnet;
+            });
 
         return response()->json(['data' => $carnets]);
     }

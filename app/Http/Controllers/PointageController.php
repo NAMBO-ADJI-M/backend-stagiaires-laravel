@@ -15,8 +15,10 @@ class PointageController extends Controller
     {
         $data = $request->validate([
             'carnet_id' => 'required|string|exists:carnets_de_stage,id',
-            'position_lat' => 'required|numeric',
-            'position_lng' => 'required|numeric',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'position_lat' => 'nullable|numeric', // Support de l'ancien nom
+            'position_lng' => 'nullable|numeric',
         ]);
 
         $carnet = CarnetDeStage::where('id', $data['carnet_id'])
@@ -39,8 +41,8 @@ class PointageController extends Controller
             'carnet_id' => $carnet->id,
             'type' => 'PRESENCE',
             'date_debut' => now(),
-            'position_lat' => $data['position_lat'],
-            'position_lng' => $data['position_lng'],
+            'position_lat' => $data['latitude'] ?? $data['position_lat'] ?? 0,
+            'position_lng' => $data['longitude'] ?? $data['position_lng'] ?? 0,
             'source_validation' => 'AUTOMATIQUE',
             'session_id' => (string) Str::uuid(),
             'statut_cloture' => 'EN_ATTENTE',
@@ -80,9 +82,24 @@ class PointageController extends Controller
     // Liste les entrées de présence d'un carnet (pour vérifier visuellement)
     public function historique(Request $request, string $carnetId)
     {
-        $carnet = CarnetDeStage::where('id', $carnetId)
-            ->where('stagiaire_id', $request->user()->stagiaire->id)
-            ->firstOrFail();
+        $user = $request->user();
+        $carnet = CarnetDeStage::findOrFail($carnetId);
+
+        // Autorisation : Stagiaire propriétaire ou Tuteur autorisé
+        $isProprietaire = $user->role === 'stagiaire' && $carnet->stagiaire_id === $user->stagiaire->id;
+
+        $isTuteurAutorise = false;
+        if ($user->role === 'entreprise') {
+            $autorisation = \App\Models\AutorisationPointage::where('stagiaire_id', $carnet->stagiaire_id)
+                ->where('entreprise_id', $user->entreprise->id)
+                ->where('statut', 'ACTIVE')
+                ->exists();
+            $isTuteurAutorise = $autorisation && ($carnet->entreprise_id === $user->entreprise->id);
+        }
+
+        if (!$isProprietaire && !$isTuteurAutorise) {
+            return response()->json(['message' => 'Accès refusé au suivi de présence.'], 403);
+        }
 
         return EntreeCarnet::where('carnet_id', $carnet->id)
             ->where('type', 'PRESENCE')

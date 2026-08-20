@@ -42,7 +42,6 @@ Route::prefix('referentiel')->group(function () {
     Route::get('metiers', [ReferentielController::class, 'metiers']);
     Route::get('niveaux-formation', [ReferentielController::class, 'niveauxFormation']);
     Route::get('competences', [ReferentielController::class, 'competences']);
-    Route::get('carte-stages', [ReferentielController::class, 'carteStages']);
 });
 
 // ================================================
@@ -73,6 +72,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+    // Autorisations de pointage (Handshake)
+    Route::post('pointage/autorisation', [AutorisationPointageController::class, 'stagiaireToggle']);
+    Route::post('pointage/repondre', [AutorisationPointageController::class, 'stagiaireRepond']);
+    Route::get('pointage/{carnetId}/historique', [PointageController::class, 'historique']);
+    Route::post('entreprise/demander-suivi', [AutorisationPointageController::class, 'entrepriseDemande']);
 
     // ============================================
     // PROFIL - Complétion
@@ -117,7 +122,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('pointage')->group(function () {
             Route::post('arrivee', [PointageController::class, 'arrivee']);
             Route::post('depart', [PointageController::class, 'depart']);
-            Route::get('{carnetId}/historique', [PointageController::class, 'historique']);
         });
 
         // Documents
