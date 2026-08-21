@@ -310,15 +310,19 @@ class CarnetController extends Controller
                 return $carnet;
             });
 
-        // 2. Stagiaires disponibles (ceux qui n'ont pas de carnet rattaché à une entreprise)
-        $disponibles = CarnetDeStage::whereNull('entreprise_id')
-            ->with(['stagiaire:id,nom,prenom,photo_profil'])
-            ->limit(10)
+        // 2. Stagiaires disponibles (tous ceux qui ont un compte mais pas encore de stage actif)
+        $disponibles = \App\Models\Stagiaire::whereDoesntHave('carnets', function ($q) {
+                $q->where('statut', 'EN_COURS')->whereNotNull('entreprise_id');
+            })
+            ->select('id', 'email', 'nom', 'prenom', 'photo_profil', 'created_at')
+            ->orderByDesc('created_at')
             ->get()
-            ->map(function($carnet) {
-                $carnet->is_linked = false;
-                $carnet->autorisation_pointage_statut = 'DISPONIBLE';
-                return $carnet;
+            ->map(function($stagiaire) {
+                return [
+                    'stagiaire' => $stagiaire,
+                    'autorisation_pointage_statut' => 'DISPONIBLE',
+                    'is_linked' => false
+                ];
             });
 
         return response()->json([
@@ -340,11 +344,7 @@ class CarnetController extends Controller
             ->where('statut', 'EN_COURS')
             ->count();
 
-        $nbMissions = EntreeCarnet::whereIn('carnet_id', $carnetsIds)
-            ->where('type', 'MISSION')
-            ->count();
-
-        // Calcul de la progression moyenne (basée sur l'assiduité)
+        // Calcul de l'assiduité moyenne pour l'ensemble des stagiaires rattachés
         $progressions = IndicateurAssiduite::whereIn('carnet_id', $carnetsIds)->get();
         $moyenne = 0;
         if ($progressions->isNotEmpty()) {
@@ -357,7 +357,6 @@ class CarnetController extends Controller
         return response()->json([
             'data' => [
                 'stagiaires_actifs' => $nbActifs,
-                'missions_assignees' => $nbMissions,
                 'progression_moyenne' => $moyenne,
                 'alertes' => $this->detecterInactivite($entrepriseId),
             ]
@@ -365,7 +364,8 @@ class CarnetController extends Controller
     }
 
     /**
-     * Détecte les stagiaires qui n'ont pas ajouté d'entrée depuis plus de 3 jours.
+     * Détecte les stagiaires qui n'ont pas pointé depuis plus de 3 jours.
+     * Basé uniquement sur le pointage (PRESENCE) par respect pour la vie privée.
      */
     private function detecterInactivite(string $entrepriseId): array
     {
@@ -374,19 +374,20 @@ class CarnetController extends Controller
         return CarnetDeStage::where('entreprise_id', $entrepriseId)
             ->where('statut', 'EN_COURS')
             ->whereDoesntHave('entrees', function ($query) use ($troisJours) {
-                $query->where('date_debut', '>', $troisJours);
+                $query->where('type', 'PRESENCE')->where('date_debut', '>', $troisJours);
             })
             ->with('stagiaire:id,nom,prenom')
             ->get()
             ->map(function ($carnet) {
-                $derniereEntree = EntreeCarnet::where('carnet_id', $carnet->id)
+                $dernierePresence = EntreeCarnet::where('carnet_id', $carnet->id)
+                    ->where('type', 'PRESENCE')
                     ->orderByDesc('date_debut')
                     ->first();
 
                 return [
                     'carnet_id' => $carnet->id,
-                    'stagiaire_nom' => "{$carnet->stagiaire->prenom} {$carnet->stagiaire->nom}",
-                    'derniere_activite' => $derniereEntree ? $derniereEntree->date_debut->diffForHumans() : 'Jamais',
+                    'stagiaire_nom' => $carnet->stagiaire ? "{$carnet->stagiaire->prenom} {$carnet->stagiaire->nom}" : "Stagiaire inconnu",
+                    'derniere_activite' => $dernierePresence ? $dernierePresence->date_debut->diffForHumans() : 'Jamais',
                 ];
             })
             ->toArray();

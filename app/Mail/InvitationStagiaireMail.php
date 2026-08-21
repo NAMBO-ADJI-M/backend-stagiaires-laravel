@@ -16,11 +16,11 @@ class InvitationStagiaireMail extends Mailable
      * Create a new message instance.
      */
     public function __construct(
-        public string $prenom,
+        public ?string $prenom,
         public string $entreprise,
         public string $code
     ) {}
-
+ Broadway
     /**
      * Get the message envelope.
      */

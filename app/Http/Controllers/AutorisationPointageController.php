@@ -66,7 +66,7 @@ class AutorisationPointageController extends Controller
 
         $entreprise = $request->user()->entreprise;
 
-        $code = (string) random_int(100000, 999999);
+        $code = strtoupper(\Illuminate\Support\Str::random(8));
 
         $autorisation = AutorisationPointage::updateOrCreate(
             ['stagiaire_id' => $validated['stagiaire_id'], 'entreprise_id' => $entreprise->id],

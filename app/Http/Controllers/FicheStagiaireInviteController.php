@@ -16,9 +16,9 @@ class FicheStagiaireInviteController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'nom' => 'required|string|max:100',
-            'prenom' => 'required|string|max:100',
             'email' => 'required|email',
+            'nom' => 'nullable|string|max:100',
+            'prenom' => 'nullable|string|max:100',
 
             // Données du contrat (Projet de convention)
             'poste' => 'required|string|max:255',
@@ -53,7 +53,7 @@ class FicheStagiaireInviteController extends Controller
         // 1. Envoi par e-mail (Brevo)
         try {
             Mail::to($data['email'])->send(new InvitationStagiaireMail(
-                $data['prenom'],
+                $data['prenom'] ?? '',
                 $entrepriseNom,
                 $code
             ));
