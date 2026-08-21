@@ -95,20 +95,27 @@ class AutorisationPointageController extends Controller
         ]);
     }
 
-    /**
-     * Étape 1 Stagiaire : Vérifie le code (invitation ou liaison existante).
-     */
     public function verifierCode(Request $request)
     {
         $request->validate(['code' => 'required|string']);
 
-        $code = $request->code;
-        $stagiaire = $request->user()->stagiaire;
+        $code = strtoupper(trim($request->code));
+        $user = $request->user();
+        $stagiaire = $user->stagiaire;
+        $userEmail = strtolower($user->email);
 
-        // 1. Chercher dans les invitations (Nouveau Stagiaire)
-        $invit = \App\Models\FicheStagiaireInvite::where('code_invitation', $code)->with('entreprise:id,raison_sociale')->first();
+        // 1. Chercher dans les invitations (Nouveau Stagiaire ou Première Liaison)
+        $invit = \App\Models\FicheStagiaireInvite::where('code_invitation', $code)
+            ->where('utilise', false)
+            ->with('entreprise:id,raison_sociale')
+            ->first();
 
         if ($invit) {
+            // Sécurité : Vérifier que l'email de l'invitation correspond à l'utilisateur connecté
+            if (strtolower($invit->email) !== $userEmail) {
+                return response()->json(['message' => 'Ce code a été généré pour une autre adresse email.'], 422);
+            }
+
             return response()->json([
                 'entreprise_nom' => $invit->entreprise->raison_sociale,
                 'entreprise_id' => $invit->entreprise_id,
@@ -131,11 +138,11 @@ class AutorisationPointageController extends Controller
                 'conditions_stage' => $invit->conditions_stage,
                 'stagiaire_nom' => $stagiaire->nom,
                 'stagiaire_prenom' => $stagiaire->prenom,
-                'stagiaire_email' => $stagiaire->email,
+                'stagiaire_email' => $user->email,
             ]);
         }
 
-        // 2. Chercher dans les liaisons existantes (Liaison par code direct)
+        // 2. Chercher dans les liaisons directes (Ancien flux ou code manuel)
         $autorisation = AutorisationPointage::where('code_validation', $code)
             ->where('stagiaire_id', $stagiaire->id)
             ->with('entreprise:id,raison_sociale')
@@ -164,10 +171,13 @@ class AutorisationPointageController extends Controller
                 'modalites_suivi_detail' => $autorisation->modalites_suivi_detail,
                 'stagiaire_nom' => $stagiaire->nom,
                 'stagiaire_prenom' => $stagiaire->prenom,
-                'stagiaire_email' => $stagiaire->email,
+                'stagiaire_email' => $user->email,
             ]);
         }
 
+        return response()->json(['message' => 'Code incorrect, déjà utilisé ou expiré.'], 422);
+    }
+ Broadway
         return response()->json(['message' => 'Code incorrect ou expiré.'], 422);
     }
 
