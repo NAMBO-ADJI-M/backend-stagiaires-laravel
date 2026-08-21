@@ -15,6 +15,7 @@ class AutorisationPointage extends Model
         'stagiaire_id',
         'entreprise_id',
         'statut',
+        'code_validation',
     ];
 
     public function stagiaire()

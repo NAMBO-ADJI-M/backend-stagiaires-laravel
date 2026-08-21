@@ -48,26 +48,61 @@ class AutorisationPointageController extends Controller
 
         $entreprise = $request->user()->entreprise;
 
+        // Générer un code à 6 chiffres
+        $code = (string) random_int(100000, 999999);
+
         $autorisation = AutorisationPointage::updateOrCreate(
             ['stagiaire_id' => $request->stagiaire_id, 'entreprise_id' => $entreprise->id],
-            ['statut' => 'EN_ATTENTE']
+            ['statut' => 'EN_ATTENTE', 'code_validation' => $code]
         );
 
-        // Envoyer la notification au stagiaire
+        // Envoyer la notification au stagiaire avec le CODE
         $stagiaire = Stagiaire::find($request->stagiaire_id);
-        // On suppose qu'une classe DemandeSuiviNotification existe ou sera créée
-        // Pour l'instant on utilise notify() de base si le modèle User le supporte
         $stagiaire->user->notify(new \App\Notifications\GenericNotification([
             'type' => 'DEMANDE_SUIVI',
-            'title' => 'Demande de suivi',
-            'message' => "L'entreprise {$entreprise->raison_sociale} souhaite accéder à votre suivi de pointage.",
+            'title' => '🔒 Demande de liaison',
+            'message' => "L'entreprise {$entreprise->raison_sociale} souhaite activer votre suivi de pointage. Utilisez le code {$code} sur votre écran d'accueil.",
+            'code' => $code,
             'entreprise_id' => $entreprise->id,
             'autorisation_id' => $autorisation->id
         ]));
 
         return response()->json([
-            'message' => 'Demande de suivi envoyée.',
+            'message' => 'Demande de suivi envoyée avec code.',
             'statut' => $autorisation->statut
+        ]);
+    }
+
+    /**
+     * Le stagiaire valide le code saisi sur l'accueil.
+     * Une fois validé, c'est permanent pour le stage.
+     */
+    public function validerCode(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string|size:6',
+            'entreprise_id' => 'required|uuid|exists:entreprises,id'
+        ]);
+
+        $stagiaire = $request->user()->stagiaire;
+
+        $autorisation = AutorisationPointage::where('stagiaire_id', $stagiaire->id)
+            ->where('entreprise_id', $request->entreprise_id)
+            ->where('code_validation', $request->code)
+            ->first();
+
+        if (!$autorisation) {
+            return response()->json(['message' => 'Code incorrect ou invalide.'], 422);
+        }
+
+        $autorisation->update([
+            'statut' => 'ACTIVE',
+            'code_validation' => null // Consommé
+        ]);
+
+        return response()->json([
+            'message' => 'Liaison établie avec succès !',
+            'statut' => 'ACTIVE'
         ]);
     }
 

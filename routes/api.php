@@ -76,6 +76,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Autorisations de pointage (Handshake)
     Route::post('pointage/autorisation', [AutorisationPointageController::class, 'stagiaireToggle']);
     Route::post('pointage/repondre', [AutorisationPointageController::class, 'stagiaireRepond']);
+    Route::post('pointage/valider-code', [AutorisationPointageController::class, 'validerCode']);
     Route::get('pointage/{carnetId}/historique', [PointageController::class, 'historique']);
     Route::post('entreprise/demander-suivi', [AutorisationPointageController::class, 'entrepriseDemande']);
 
