@@ -168,6 +168,7 @@ class CarnetController extends Controller
 
     /**
      * Stats agrégées pour le dashboard (stagiaire ou entreprise/tuteur rattaché).
+     * LOGIQUE DE CONFIDENTIALITÉ : Le tuteur ne voit QUE les stats de présence.
      */
     public function stats(Request $request, string $carnetId)
     {
@@ -178,47 +179,53 @@ class CarnetController extends Controller
         $joursPresents = $indicateur->jours_presents ?? 0;
         $joursAttendus = $indicateur->jours_attendus ?? 0;
 
-        $missionsTotales = EntreeCarnet::where('carnet_id', $carnet->id)
-            ->where('type', 'MISSION')
-            ->count();
-
-        $missionsCompletees = EntreeCarnet::where('carnet_id', $carnet->id)
-            ->where('type', 'MISSION')
-            ->whereNotNull('date_fin')
-            ->count();
-
-        $competencesValidees = ProgressionCompetence::where('carnet_id', $carnet->id)
-            ->where('niveau_tuteur', 'MAITRISEE')
-            ->count();
-
         $progressionGlobale = $joursAttendus > 0
             ? (int) round(($joursPresents / $joursAttendus) * 100)
             : 0;
 
-        return response()->json([
-            'data' => [
-                'progression_globale' => $progressionGlobale,
-                'jours_presents' => $joursPresents,
-                'jours_attendus' => $joursAttendus,
-                'missions_completees' => $missionsCompletees,
-                'missions_totales' => $missionsTotales,
-                'competences_validees' => $competencesValidees,
-                'activites_recentes' => $this->activitesRecentes($carnet->id),
-            ],
-        ]);
+        $stats = [
+            'progression_globale' => $progressionGlobale,
+            'jours_presents' => $joursPresents,
+            'jours_attendus' => $joursAttendus,
+            'activites_recentes' => $this->activitesRecentes($carnet->id, $request->user()->role),
+        ];
+
+        // LOGIQUE PRIVÉE : Seul le stagiaire voit le détail des missions et compétences
+        if ($request->user()->role === 'stagiaire') {
+            $missionsTotales = EntreeCarnet::where('carnet_id', $carnet->id)
+                ->where('type', 'MISSION')
+                ->count();
+
+            $missionsCompletees = EntreeCarnet::where('carnet_id', $carnet->id)
+                ->where('type', 'MISSION')
+                ->whereNotNull('date_fin')
+                ->count();
+
+            $competencesValidees = ProgressionCompetence::where('carnet_id', $carnet->id)
+                ->where('niveau_tuteur', 'MAITRISEE')
+                ->count();
+
+            $stats['missions_completees'] = $missionsCompletees;
+            $stats['missions_totales'] = $missionsTotales;
+            $stats['competences_validees'] = $competencesValidees;
+        }
+
+        return response()->json(['data' => $stats]);
     }
 
     /**
-     * Journal complet d'un carnet : toutes les entrées MISSION et
-     * DIFFICULTE, sans limite (contrairement à activitesRecentes()
-     * qui n'en montre que 5, mélangées aux encouragements et à la
-     * présence). Alimente l'onglet "Journal" du carnet, côté
-     * stagiaire comme côté entreprise/tuteur rattaché.
+     * Journal complet d'un carnet.
+     * LOGIQUE DE CONFIDENTIALITÉ : Le tuteur n'a pas accès au journal des missions.
      */
     public function entrees(Request $request, string $carnetId)
     {
         $carnet = CarnetDeStage::findOrFail($carnetId);
         $this->autoriserAccesCarnet($request, $carnet);
+
+        // Les missions et difficultés sont PRIVÉES
+        if ($request->user()->role === 'entreprise') {
+            return response()->json(['data' => [], 'message' => 'Le journal des missions est privé.'], 403);
+        }
 
         $entrees = EntreeCarnet::where('carnet_id', $carnet->id)
             ->whereIn('type', ['MISSION', 'DIFFICULTE'])
@@ -291,7 +298,15 @@ class CarnetController extends Controller
                     ->where('entreprise_id', $entrepriseId)
                     ->first();
 
+                // Calcul de l'assiduité réelle
+                $indicateur = IndicateurAssiduite::where('carnet_id', $carnet->id)->first();
+                $joursPresents = $indicateur->jours_presents ?? 0;
+                $joursAttendus = $indicateur->jours_attendus ?? 0;
+                $progression = $joursAttendus > 0 ? ($joursPresents / $joursAttendus) : 0;
+
                 $carnet->autorisation_pointage_statut = $autorisation ? $autorisation->statut : 'INACTIVE';
+                $carnet->presence_progress = $progression;
+
                 return $carnet;
             });
 
@@ -365,6 +380,7 @@ class CarnetController extends Controller
 
     /**
      * Permet au tuteur de laisser un commentaire sur une entrée spécifique.
+     * LOGIQUE DE CONFIDENTIALITÉ : Interdit si l'entrée est de type MISSION ou DIFFICULTE.
      */
     public function commenterEntree(Request $request, string $entreeId)
     {
@@ -372,11 +388,12 @@ class CarnetController extends Controller
             'commentaire_tuteur' => 'required|string|max:1000',
         ]);
 
-        $entree = EntreeCarnet::where('id', $entreeId)
-            ->whereHas('carnet', function ($q) use ($request) {
-                $q->where('entreprise_id', $request->user()->entreprise->id);
-            })
-            ->firstOrFail();
+        $entree = EntreeCarnet::findOrFail($entreeId);
+
+        // Sécurité : Un tuteur ne peut commenter que ce qu'il voit (donc uniquement les pointages)
+        if ($entree->type !== 'PRESENCE') {
+            return response()->json(['message' => 'Action non autorisée sur ce type d\'entrée.'], 403);
+        }
 
         $entree->update([
             'commentaire_tuteur' => $validated['commentaire_tuteur'],
@@ -385,11 +402,16 @@ class CarnetController extends Controller
         return response()->json(['message' => 'Commentaire ajouté.', 'data' => $entree]);
     }
 
-    private function activitesRecentes(string $carnetId): array
+    private function activitesRecentes(string $carnetId, string $role = 'stagiaire'): array
     {
-        $entrees = EntreeCarnet::where('carnet_id', $carnetId)
-            ->whereNotNull('date_fin')
-            ->orderByDesc('date_fin')
+        $query = EntreeCarnet::where('carnet_id', $carnetId)->whereNotNull('date_fin');
+
+        // CONFIDENTIALITÉ : Le tuteur ne voit que les activités de type PRESENCE
+        if ($role === 'entreprise') {
+            $query->where('type', 'PRESENCE');
+        }
+
+        $entrees = $query->orderByDesc('date_fin')
             ->limit(5)
             ->get()
             ->map(function ($e) {
@@ -406,6 +428,7 @@ class CarnetController extends Controller
                 ];
             });
 
+        // Les encouragements sont visibles par les deux
         $notifications = NotificationEncouragement::where('carnet_id', $carnetId)
             ->orderByDesc('date_envoi')
             ->limit(5)

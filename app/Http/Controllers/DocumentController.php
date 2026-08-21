@@ -20,10 +20,14 @@ class DocumentController extends Controller
             ->with(['entreprise', 'stagiaire'])
             ->firstOrFail();
 
+        // Récupérer l'URL complète du logo (si présent)
+        $logoUrl = $autorisation->entreprise->photo_profil_url;
+
         $pdf = Pdf::loadView('pdf.convention', [
             'autorisation' => $autorisation,
             'entreprise' => $autorisation->entreprise,
             'stagiaire' => $autorisation->stagiaire,
+            'logo_url' => $logoUrl,
         ]);
 
         return $pdf->download("convention-stage-{$autorisation->id}.pdf");

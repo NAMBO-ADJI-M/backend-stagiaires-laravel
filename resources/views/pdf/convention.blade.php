@@ -22,6 +22,9 @@
 <body>
 
 <div class="header">
+    @if(isset($logo_url) && $logo_url)
+        <img src="{{ $logo_url }}" alt="Logo Entreprise" style="max-height: 60px; margin-bottom: 10px;">
+    @endif
     <h1>Convention de Stage Professionnel</h1>
     <p>StageLink - Plateforme de Suivi et de Certification</p>
 </div>

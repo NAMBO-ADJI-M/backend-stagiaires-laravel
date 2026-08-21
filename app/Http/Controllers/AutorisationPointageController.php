@@ -96,101 +96,149 @@ class AutorisationPointageController extends Controller
     }
 
     /**
-     * Étape 1 Stagiaire : Vérifie le code et renvoie les conditions du tuteur.
+     * Étape 1 Stagiaire : Vérifie le code (invitation ou liaison existante).
      */
     public function verifierCode(Request $request)
     {
-        $request->validate([
-            'code' => 'required|string|size:6',
-        ]);
+        $request->validate(['code' => 'required|string']);
 
+        $code = $request->code;
         $stagiaire = $request->user()->stagiaire;
 
-        $autorisation = AutorisationPointage::where('stagiaire_id', $stagiaire->id)
-            ->where('code_validation', $request->code)
+        // 1. Chercher dans les invitations (Nouveau Stagiaire)
+        $invit = \App\Models\FicheStagiaireInvite::where('code_invitation', $code)->with('entreprise:id,raison_sociale')->first();
+
+        if ($invit) {
+            return response()->json([
+                'entreprise_nom' => $invit->entreprise->raison_sociale,
+                'entreprise_id' => $invit->entreprise_id,
+                'poste' => $invit->poste,
+                'date_debut' => $invit->date_debut,
+                'date_fin' => $invit->date_fin,
+                'etablissement_nom' => $invit->etablissement_nom,
+                'tuteur_designe' => $invit->tuteur_designe,
+                'objet_stage' => $invit->objet_stage,
+                'cursus_rattachement' => $invit->cursus_rattachement,
+                'lieu_execution' => $invit->lieu_execution,
+                'lieu_execution_lat' => $invit->lieu_execution_lat,
+                'lieu_execution_lng' => $invit->lieu_execution_lng,
+                'duree_hebdomadaire' => $invit->duree_hebdomadaire,
+                'jours_presence' => $invit->jours_presence,
+                'teletravail_modalites' => $invit->teletravail_modalites,
+                'referent_pedagogique_nom' => $invit->referent_pedagogique_nom,
+                'referent_pedagogique_contact' => $invit->referent_pedagogique_contact,
+                'modalites_suivi_detail' => $invit->modalites_suivi_detail,
+                'conditions_stage' => $invit->conditions_stage,
+                'stagiaire_nom' => $stagiaire->nom,
+                'stagiaire_prenom' => $stagiaire->prenom,
+                'stagiaire_email' => $stagiaire->email,
+            ]);
+        }
+
+        // 2. Chercher dans les liaisons existantes (Liaison par code direct)
+        $autorisation = AutorisationPointage::where('code_validation', $code)
+            ->where('stagiaire_id', $stagiaire->id)
             ->with('entreprise:id,raison_sociale')
             ->first();
 
-        if (!$autorisation) {
-            return response()->json(['message' => 'Code incorrect ou expiré.'], 422);
+        if ($autorisation) {
+            return response()->json([
+                'entreprise_nom' => $autorisation->entreprise->raison_sociale,
+                'entreprise_id' => $autorisation->entreprise_id,
+                'poste' => $autorisation->poste,
+                'date_debut' => $autorisation->date_debut,
+                'date_fin' => $autorisation->date_fin,
+                'conditions_stage' => $autorisation->conditions_stage,
+                'etablissement_nom' => $autorisation->etablissement_nom,
+                'tuteur_designe' => $autorisation->tuteur_designe,
+                'objet_stage' => $autorisation->objet_stage,
+                'cursus_rattachement' => $autorisation->cursus_rattachement,
+                'lieu_execution' => $autorisation->lieu_execution,
+                'lieu_execution_lat' => $autorisation->lieu_execution_lat,
+                'lieu_execution_lng' => $autorisation->lieu_execution_lng,
+                'duree_hebdomadaire' => $autorisation->duree_hebdomadaire,
+                'jours_presence' => $autorisation->jours_presence,
+                'teletravail_modalites' => $autorisation->teletravail_modalites,
+                'referent_pedagogique_nom' => $autorisation->referent_pedagogique_nom,
+                'referent_pedagogique_contact' => $autorisation->referent_pedagogique_contact,
+                'modalites_suivi_detail' => $autorisation->modalites_suivi_detail,
+                'stagiaire_nom' => $stagiaire->nom,
+                'stagiaire_prenom' => $stagiaire->prenom,
+                'stagiaire_email' => $stagiaire->email,
+            ]);
         }
 
-        return response()->json([
-            'entreprise_nom' => $autorisation->entreprise->raison_sociale,
-            'entreprise_id' => $autorisation->entreprise_id,
-            'poste' => $autorisation->poste,
-            'date_debut' => $autorisation->date_debut,
-            'date_fin' => $autorisation->date_fin,
-            'conditions_stage' => $autorisation->conditions_stage,
-            'etablissement_nom' => $autorisation->etablissement_nom,
-            'tuteur_designe' => $autorisation->tuteur_designe,
-            'objet_stage' => $autorisation->objet_stage,
-            'cursus_rattachement' => $autorisation->cursus_rattachement,
-            'lieu_execution' => $autorisation->lieu_execution,
-            'lieu_execution_lat' => $autorisation->lieu_execution_lat,
-            'lieu_execution_lng' => $autorisation->lieu_execution_lng,
-            'duree_hebdomadaire' => $autorisation->duree_hebdomadaire,
-            'jours_presence' => $autorisation->jours_presence,
-            'teletravail_modalites' => $autorisation->teletravail_modalites,
-            'referent_pedagogique_nom' => $autorisation->referent_pedagogique_nom,
-            'referent_pedagogique_contact' => $autorisation->referent_pedagogique_contact,
-            'modalites_suivi_detail' => $autorisation->modalites_suivi_detail,
-
-            // Infos pré-remplies du stagiaire (pour le formulaire)
-            'stagiaire_nom' => $stagiaire->nom,
-            'stagiaire_prenom' => $stagiaire->prenom,
-            'stagiaire_email' => $stagiaire->email,
-        ]);
+        return response()->json(['message' => 'Code incorrect ou expiré.'], 422);
     }
 
     /**
-     * Étape 2 Stagiaire : Valide définitivement la liaison en complétant les données manquantes.
+     * Étape 2 Stagiaire : Valide définitivement la liaison.
      */
     public function validerLiaison(Request $request)
     {
-        // ... (validation inchangée)
         $request->validate([
-            'code' => 'required|string|size:6',
+            'code' => 'required|string',
             'entreprise_id' => 'required|uuid|exists:entreprises,id',
-
-            // Informations obligatoires du stagiaire pour la convention
             'stagiaire_date_naissance' => 'required|date',
             'stagiaire_adresse' => 'required|string|max:255',
             'stagiaire_telephone' => 'required|string|max:20',
-            'etablissement_nom' => 'required|string|max:255',
-            'cursus_rattachement' => 'required|string|max:255',
-            'referent_pedagogique_nom' => 'required|string|max:255',
-            'referent_pedagogique_contact' => 'required|string|max:255',
         ]);
 
         $stagiaire = $request->user()->stagiaire;
 
-        $autorisation = AutorisationPointage::where('stagiaire_id', $stagiaire->id)
-            ->where('entreprise_id', $request->entreprise_id)
-            ->where('code_validation', $request->code)
-            ->first();
+        // Rechercher si c'est une invitation
+        $invit = \App\Models\FicheStagiaireInvite::where('code_invitation', $request->code)->first();
 
-        if (!$autorisation) {
-            return response()->json(['message' => 'Liaison impossible.'], 422);
+        if ($invit) {
+            // Créer l'autorisation réelle à partir du brouillon d'invitation
+            $autorisation = AutorisationPointage::updateOrCreate(
+                ['stagiaire_id' => $stagiaire->id, 'entreprise_id' => $request->entreprise_id],
+                [
+                    'statut' => 'ACTIVE',
+                    'poste' => $invit->poste,
+                    'date_debut' => $invit->date_debut,
+                    'date_fin' => $invit->date_fin,
+                    'etablissement_nom' => $invit->etablissement_nom,
+                    'tuteur_designe' => $invit->tuteur_designe,
+                    'objet_stage' => $invit->objet_stage,
+                    'cursus_rattachement' => $invit->cursus_rattachement,
+                    'lieu_execution' => $invit->lieu_execution,
+                    'lieu_execution_lat' => $invit->lieu_execution_lat,
+                    'lieu_execution_lng' => $invit->lieu_execution_lng,
+                    'duree_hebdomadaire' => $invit->duree_hebdomadaire,
+                    'jours_presence' => $invit->jours_presence,
+                    'teletravail_modalites' => $invit->teletravail_modalites,
+                    'referent_pedagogique_nom' => $invit->referent_pedagogique_nom,
+                    'referent_pedagogique_contact' => $invit->referent_pedagogique_contact,
+                    'modalites_suivi_detail' => $invit->modalites_suivi_detail,
+                    'conditions_stage' => $invit->conditions_stage,
+                    'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
+                    'stagiaire_adresse' => $request->stagiaire_adresse,
+                    'stagiaire_telephone' => $request->stagiaire_telephone,
+                ]
+            );
+
+            $invit->update(['utilise' => true]);
+            return response()->json(['message' => 'Liaison établie !', 'statut' => 'ACTIVE']);
         }
 
-        // Mise à jour finale avec les données du stagiaire
-        $autorisation->update([
-            'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
-            'stagiaire_adresse' => $request->stagiaire_adresse,
-            'stagiaire_telephone' => $request->stagiaire_telephone,
-            'etablissement_nom' => $request->etablissement_nom,
-            'cursus_rattachement' => $request->cursus_rattachement,
-            'referent_pedagogique_nom' => $request->referent_pedagogique_nom,
-            'referent_pedagogique_contact' => $request->referent_pedagogique_contact,
-            'statut' => 'ACTIVE',
-            'code_validation' => null // Le code est consommé
-        ]);
+        // Sinon chercher liaison directe
+        $autorisation = AutorisationPointage::where('code_validation', $request->code)
+            ->where('stagiaire_id', $stagiaire->id)
+            ->first();
 
-        return response()->json([
-            'message' => 'Convention signée et liaison établie !',
-            'statut' => 'ACTIVE'
-        ]);
+        if ($autorisation) {
+            $autorisation->update([
+                'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
+                'stagiaire_adresse' => $request->stagiaire_adresse,
+                'stagiaire_telephone' => $request->stagiaire_telephone,
+                'statut' => 'ACTIVE',
+                'code_validation' => null
+            ]);
+            return response()->json(['message' => 'Liaison établie !', 'statut' => 'ACTIVE']);
+        }
+
+        return response()->json(['message' => 'Validation impossible.'], 422);
     }
 
     /**
