@@ -13,6 +13,9 @@ class AutorisationPointage extends Model
 
     protected $fillable = [
         'stagiaire_id',
+        'stagiaire_date_naissance',
+        'stagiaire_adresse',
+        'stagiaire_telephone',
         'entreprise_id',
         'statut',
         'code_validation',

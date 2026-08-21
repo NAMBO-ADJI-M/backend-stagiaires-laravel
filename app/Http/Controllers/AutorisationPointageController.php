@@ -135,17 +135,32 @@ class AutorisationPointageController extends Controller
             'referent_pedagogique_nom' => $autorisation->referent_pedagogique_nom,
             'referent_pedagogique_contact' => $autorisation->referent_pedagogique_contact,
             'modalites_suivi_detail' => $autorisation->modalites_suivi_detail,
+
+            // Infos pré-remplies du stagiaire (pour le formulaire)
+            'stagiaire_nom' => $stagiaire->nom,
+            'stagiaire_prenom' => $stagiaire->prenom,
+            'stagiaire_email' => $stagiaire->email,
         ]);
     }
 
     /**
-     * Étape 2 Stagiaire : Valide définitivement la liaison.
+     * Étape 2 Stagiaire : Valide définitivement la liaison en complétant les données manquantes.
      */
     public function validerLiaison(Request $request)
     {
+        // ... (validation inchangée)
         $request->validate([
             'code' => 'required|string|size:6',
-            'entreprise_id' => 'required|uuid|exists:entreprises,id'
+            'entreprise_id' => 'required|uuid|exists:entreprises,id',
+
+            // Informations obligatoires du stagiaire pour la convention
+            'stagiaire_date_naissance' => 'required|date',
+            'stagiaire_adresse' => 'required|string|max:255',
+            'stagiaire_telephone' => 'required|string|max:20',
+            'etablissement_nom' => 'required|string|max:255',
+            'cursus_rattachement' => 'required|string|max:255',
+            'referent_pedagogique_nom' => 'required|string|max:255',
+            'referent_pedagogique_contact' => 'required|string|max:255',
         ]);
 
         $stagiaire = $request->user()->stagiaire;
@@ -159,15 +174,75 @@ class AutorisationPointageController extends Controller
             return response()->json(['message' => 'Liaison impossible.'], 422);
         }
 
+        // Mise à jour finale avec les données du stagiaire
         $autorisation->update([
+            'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
+            'stagiaire_adresse' => $request->stagiaire_adresse,
+            'stagiaire_telephone' => $request->stagiaire_telephone,
+            'etablissement_nom' => $request->etablissement_nom,
+            'cursus_rattachement' => $request->cursus_rattachement,
+            'referent_pedagogique_nom' => $request->referent_pedagogique_nom,
+            'referent_pedagogique_contact' => $request->referent_pedagogique_contact,
             'statut' => 'ACTIVE',
-            'code_validation' => null // Consommé
+            'code_validation' => null // Le code est consommé
         ]);
 
         return response()->json([
-            'message' => 'Liaison établie avec succès !',
+            'message' => 'Convention signée et liaison établie !',
             'statut' => 'ACTIVE'
         ]);
+    }
+
+    /**
+     * Étape 2 Stagiaire (Alternative) : Décline l'offre de stage.
+     */
+    public function declinerLiaison(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string|size:6',
+            'entreprise_id' => 'required|uuid|exists:entreprises,id'
+        ]);
+
+        $stagiaire = $request->user()->stagiaire;
+
+        $autorisation = AutorisationPointage::where('stagiaire_id', $stagiaire->id)
+            ->where('entreprise_id', $request->entreprise_id)
+            ->where('code_validation', $request->code)
+            ->firstOrFail();
+
+        $autorisation->update([
+            'statut' => 'REFUSEE',
+            'code_validation' => null
+        ]);
+
+        return response()->json(['message' => 'Offre déclinée.']);
+    }
+
+    /**
+     * Étape 2 Stagiaire (Option 2) : Décline l'offre de stage.
+     */
+    public function declinerLiaison(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string|size:6',
+        ]);
+
+        $stagiaire = $request->user()->stagiaire;
+
+        $autorisation = AutorisationPointage::where('stagiaire_id', $stagiaire->id)
+            ->where('code_validation', $request->code)
+            ->first();
+
+        if (!$autorisation) {
+            return response()->json(['message' => 'Liaison introuvable.'], 404);
+        }
+
+        $autorisation->update([
+            'statut' => 'REFUSEE',
+            'code_validation' => null
+        ]);
+
+        return response()->json(['message' => 'Offre déclinée.']);
     }
 
     /**

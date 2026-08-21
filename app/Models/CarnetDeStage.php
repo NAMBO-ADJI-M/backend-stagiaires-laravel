@@ -80,6 +80,12 @@ class CarnetDeStage extends Model
         return $this->hasOne(IndicateurAssiduite::class);
     }
 
+    public function autorisation()
+    {
+        return $this->hasOne(AutorisationPointage::class, 'stagiaire_id', 'stagiaire_id')
+                    ->where('entreprise_id', $this->entreprise_id);
+    }
+
     public function estRattache()
     {
         return $this->entreprise_id !== null;

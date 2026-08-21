@@ -112,12 +112,21 @@ class CarnetController extends Controller
         }
 
         $carnets = CarnetDeStage::where('stagiaire_id', $stagiaire->id)
-            ->with('entreprise:id,adresse_lat,adresse_lng,rayon_detection_metres')
+            ->with(['entreprise:id,adresse_lat,adresse_lng,rayon_detection_metres', 'autorisation'])
             ->orderByDesc('date_creation')
             ->get()
             ->map(function ($carnet) use ($stagiaire) {
-                $carnet->geofence_lat = $stagiaire->lieu_stage_lat ?? $carnet->entreprise?->adresse_lat;
-                $carnet->geofence_lng = $stagiaire->lieu_stage_lng ?? $carnet->entreprise?->adresse_lng;
+                // Priorité 1 : Lieu d'exécution saisi dans la convention
+                // Priorité 2 : Lieu de stage précis saisi par le stagiaire
+                // Priorité 3 : Adresse du siège de l'entreprise
+                $carnet->geofence_lat = $carnet->autorisation?->lieu_execution_lat
+                    ?? $stagiaire->lieu_stage_lat
+                    ?? $carnet->entreprise?->adresse_lat;
+
+                $carnet->geofence_lng = $carnet->autorisation?->lieu_execution_lng
+                    ?? $stagiaire->lieu_stage_lng
+                    ?? $carnet->entreprise?->adresse_lng;
+
                 $carnet->geofence_rayon = $stagiaire->rayon_geofence
                     ?? $carnet->entreprise?->rayon_detection_metres
                     ?? 100;
