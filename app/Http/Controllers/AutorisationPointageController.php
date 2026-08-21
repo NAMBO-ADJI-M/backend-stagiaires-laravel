@@ -219,6 +219,10 @@ class AutorisationPointageController extends Controller
             );
 
             $invit->update(['utilise' => true]);
+
+            // ENVOI DE LA CONVENTION PAR MAIL
+            $this->envoyerConventionParMail($autorisation);
+
             return response()->json(['message' => 'Liaison établie !', 'statut' => 'ACTIVE']);
         }
 
@@ -235,10 +239,35 @@ class AutorisationPointageController extends Controller
                 'statut' => 'ACTIVE',
                 'code_validation' => null
             ]);
+
+            // ENVOI DE LA CONVENTION PAR MAIL
+            $this->envoyerConventionParMail($autorisation);
+
             return response()->json(['message' => 'Liaison établie !', 'statut' => 'ACTIVE']);
         }
 
         return response()->json(['message' => 'Validation impossible.'], 422);
+    }
+
+    /**
+     * Génère et envoie la convention PDF au stagiaire et à l'entreprise.
+     */
+    private function envoyerConventionParMail($autorisation)
+    {
+        $autorisation->load(['entreprise', 'stagiaire']);
+
+        try {
+            $mail = new \App\Mail\ConventionSigneeMail($autorisation);
+
+            // 1. Au stagiaire
+            \Illuminate\Support\Facades\Mail::to($autorisation->stagiaire->email)->send($mail);
+
+            // 2. À l'entreprise (tuteur)
+            \Illuminate\Support\Facades\Mail::to($autorisation->entreprise->email)->send($mail);
+
+        } catch (\Exception $e) {
+            \Log::error("Erreur envoi convention PDF par mail : " . $e->getMessage());
+        }
     }
 
     /**

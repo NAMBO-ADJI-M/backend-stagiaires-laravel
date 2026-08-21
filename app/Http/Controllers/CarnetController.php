@@ -283,22 +283,22 @@ class CarnetController extends Controller
 
     /**
      * Liste tous les stagiaires (carnets) rattachés à l'entreprise connectée.
+     * PLUS : Liste les stagiaires disponibles (non rattachés) pour la découverte.
      */
     public function listeEntreprise(Request $request)
     {
         $entrepriseId = $request->user()->entreprise->id;
 
-        $carnets = CarnetDeStage::where('entreprise_id', $entrepriseId)
+        // 1. Stagiaires déjà rattachés
+        $rattaches = CarnetDeStage::where('entreprise_id', $entrepriseId)
             ->with(['stagiaire:id,nom,prenom,photo_profil'])
             ->orderByDesc('date_rattachement')
             ->get()
             ->map(function($carnet) use ($entrepriseId) {
-                // Récupérer le statut de l'autorisation de pointage
                 $autorisation = \App\Models\AutorisationPointage::where('stagiaire_id', $carnet->stagiaire_id)
                     ->where('entreprise_id', $entrepriseId)
                     ->first();
 
-                // Calcul de l'assiduité réelle
                 $indicateur = IndicateurAssiduite::where('carnet_id', $carnet->id)->first();
                 $joursPresents = $indicateur->jours_presents ?? 0;
                 $joursAttendus = $indicateur->jours_attendus ?? 0;
@@ -306,11 +306,25 @@ class CarnetController extends Controller
 
                 $carnet->autorisation_pointage_statut = $autorisation ? $autorisation->statut : 'INACTIVE';
                 $carnet->presence_progress = $progression;
-
+                $carnet->is_linked = true;
                 return $carnet;
             });
 
-        return response()->json(['data' => $carnets]);
+        // 2. Stagiaires disponibles (ceux qui n'ont pas de carnet rattaché à une entreprise)
+        $disponibles = CarnetDeStage::whereNull('entreprise_id')
+            ->with(['stagiaire:id,nom,prenom,photo_profil'])
+            ->limit(10)
+            ->get()
+            ->map(function($carnet) {
+                $carnet->is_linked = false;
+                $carnet->autorisation_pointage_statut = 'DISPONIBLE';
+                return $carnet;
+            });
+
+        return response()->json([
+            'rattaches' => $rattaches,
+            'disponibles' => $disponibles
+        ]);
     }
 
     /**
