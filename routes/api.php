@@ -76,7 +76,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Autorisations de pointage (Handshake)
     Route::post('pointage/autorisation', [AutorisationPointageController::class, 'stagiaireToggle']);
     Route::post('pointage/repondre', [AutorisationPointageController::class, 'stagiaireRepond']);
-    Route::post('pointage/valider-code', [AutorisationPointageController::class, 'validerCode']);
+    Route::post('pointage/verifier-code', [AutorisationPointageController::class, 'verifierCode']);
+    Route::post('pointage/valider-liaison', [AutorisationPointageController::class, 'validerLiaison']);
     Route::get('pointage/{carnetId}/historique', [PointageController::class, 'historique']);
     Route::post('entreprise/demander-suivi', [AutorisationPointageController::class, 'entrepriseDemande']);
 
@@ -180,6 +181,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Documents (entreprise)
         Route::prefix('documents')->group(function () {
+            Route::get('liaison/{autorisationId}/convention-pdf', [DocumentController::class, 'genererConvention']);
             Route::post('evaluations/{evaluationId}/attestation', [DocumentController::class, 'genererAttestation']);
             Route::post('evaluations/{evaluationId}/carte-appui', [DocumentController::class, 'genererCarteAppui']);
         });

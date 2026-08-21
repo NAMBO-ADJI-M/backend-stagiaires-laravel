@@ -12,6 +12,23 @@ use Illuminate\Support\Facades\Storage;
 
 class DocumentController extends Controller
 {
+    // Génère la convention de stage au format PDF à partir des données de liaison
+    public function genererConvention(Request $request, string $autorisationId)
+    {
+        $autorisation = \App\Models\AutorisationPointage::where('id', $autorisationId)
+            ->where('entreprise_id', $request->user()->entreprise->id)
+            ->with(['entreprise', 'stagiaire'])
+            ->firstOrFail();
+
+        $pdf = Pdf::loadView('pdf.convention', [
+            'autorisation' => $autorisation,
+            'entreprise' => $autorisation->entreprise,
+            'stagiaire' => $autorisation->stagiaire,
+        ]);
+
+        return $pdf->download("convention-stage-{$autorisation->id}.pdf");
+    }
+
     // Génère l'attestation seule (le tuteur peut s'arrêter là)
     public function genererAttestation(Request $request, string $evaluationId)
     {

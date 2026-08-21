@@ -42,22 +42,43 @@ class AutorisationPointageController extends Controller
      */
     public function entrepriseDemande(Request $request)
     {
-        $request->validate([
-            'stagiaire_id' => 'required|uuid|exists:stagiaires,id'
+        $validated = $request->validate([
+            'stagiaire_id' => 'required|uuid|exists:stagiaires,id',
+            'poste' => 'required|string|max:255',
+            'date_debut' => 'required|date',
+            'date_fin' => 'required|date|after_or_equal:date_debut',
+            'conditions_stage' => 'nullable|string',
+
+            'etablissement_nom' => 'nullable|string|max:255',
+            'tuteur_designe' => 'required|string|max:255',
+            'objet_stage' => 'nullable|string|max:500',
+            'cursus_rattachement' => 'nullable|string|max:255',
+            'lieu_execution' => 'nullable|string|max:255',
+            'lieu_execution_lat' => 'nullable|numeric|between:-90,90',
+            'lieu_execution_lng' => 'nullable|numeric|between:-180,180',
+            'duree_hebdomadaire' => 'nullable|string|max:100',
+            'jours_presence' => 'nullable|string|max:255',
+            'teletravail_modalites' => 'nullable|string|max:255',
+            'referent_pedagogique_nom' => 'nullable|string|max:255',
+            'referent_pedagogique_contact' => 'nullable|string|max:255',
+            'modalites_suivi_detail' => 'nullable|string',
         ]);
 
         $entreprise = $request->user()->entreprise;
 
-        // Générer un code à 6 chiffres
         $code = (string) random_int(100000, 999999);
 
         $autorisation = AutorisationPointage::updateOrCreate(
-            ['stagiaire_id' => $request->stagiaire_id, 'entreprise_id' => $entreprise->id],
-            ['statut' => 'EN_ATTENTE', 'code_validation' => $code]
+            ['stagiaire_id' => $validated['stagiaire_id'], 'entreprise_id' => $entreprise->id],
+            array_merge($validated, [
+                'statut' => 'EN_ATTENTE',
+                'code_validation' => $code,
+                'entreprise_id' => $entreprise->id,
+            ])
         );
 
         // Envoyer la notification au stagiaire avec le CODE
-        $stagiaire = Stagiaire::find($request->stagiaire_id);
+        $stagiaire = Stagiaire::find($validated['stagiaire_id']);
         $stagiaire->user->notify(new \App\Notifications\GenericNotification([
             'type' => 'DEMANDE_SUIVI',
             'title' => '🔒 Demande de liaison',
@@ -68,16 +89,59 @@ class AutorisationPointageController extends Controller
         ]));
 
         return response()->json([
-            'message' => 'Demande de suivi envoyée avec code.',
+            'message' => 'Demande de suivi envoyée avec code et contrat détaillé.',
+            'code' => $code,
             'statut' => $autorisation->statut
         ]);
     }
 
     /**
-     * Le stagiaire valide le code saisi sur l'accueil.
-     * Une fois validé, c'est permanent pour le stage.
+     * Étape 1 Stagiaire : Vérifie le code et renvoie les conditions du tuteur.
      */
-    public function validerCode(Request $request)
+    public function verifierCode(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string|size:6',
+        ]);
+
+        $stagiaire = $request->user()->stagiaire;
+
+        $autorisation = AutorisationPointage::where('stagiaire_id', $stagiaire->id)
+            ->where('code_validation', $request->code)
+            ->with('entreprise:id,raison_sociale')
+            ->first();
+
+        if (!$autorisation) {
+            return response()->json(['message' => 'Code incorrect ou expiré.'], 422);
+        }
+
+        return response()->json([
+            'entreprise_nom' => $autorisation->entreprise->raison_sociale,
+            'entreprise_id' => $autorisation->entreprise_id,
+            'poste' => $autorisation->poste,
+            'date_debut' => $autorisation->date_debut,
+            'date_fin' => $autorisation->date_fin,
+            'conditions_stage' => $autorisation->conditions_stage,
+            'etablissement_nom' => $autorisation->etablissement_nom,
+            'tuteur_designe' => $autorisation->tuteur_designe,
+            'objet_stage' => $autorisation->objet_stage,
+            'cursus_rattachement' => $autorisation->cursus_rattachement,
+            'lieu_execution' => $autorisation->lieu_execution,
+            'lieu_execution_lat' => $autorisation->lieu_execution_lat,
+            'lieu_execution_lng' => $autorisation->lieu_execution_lng,
+            'duree_hebdomadaire' => $autorisation->duree_hebdomadaire,
+            'jours_presence' => $autorisation->jours_presence,
+            'teletravail_modalites' => $autorisation->teletravail_modalites,
+            'referent_pedagogique_nom' => $autorisation->referent_pedagogique_nom,
+            'referent_pedagogique_contact' => $autorisation->referent_pedagogique_contact,
+            'modalites_suivi_detail' => $autorisation->modalites_suivi_detail,
+        ]);
+    }
+
+    /**
+     * Étape 2 Stagiaire : Valide définitivement la liaison.
+     */
+    public function validerLiaison(Request $request)
     {
         $request->validate([
             'code' => 'required|string|size:6',
@@ -92,7 +156,7 @@ class AutorisationPointageController extends Controller
             ->first();
 
         if (!$autorisation) {
-            return response()->json(['message' => 'Code incorrect ou invalide.'], 422);
+            return response()->json(['message' => 'Liaison impossible.'], 422);
         }
 
         $autorisation->update([
