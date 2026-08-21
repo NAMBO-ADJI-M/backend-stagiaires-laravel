@@ -21,6 +21,34 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TestEmailController;
 
 // ================================================
+// 🛠️ ROUTE DE SECOURS (PUBLIC)
+// Mise à jour BDD + Nettoyage sans terminal
+// ================================================
+Route::any('debug/clear-stagiaires', function() {
+    try {
+        // 1. Forcer la migration
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+
+        // 2. Nettoyage complet (Ordre respectant les contraintes)
+        \App\Models\EntreeCarnet::query()->delete();
+        \App\Models\IndicateurAssiduite::query()->delete();
+        \App\Models\ProgressionCompetence::query()->delete();
+        \App\Models\CarnetDeStage::query()->delete();
+        \App\Models\Stagiaire::query()->delete();
+        \App\Models\User::where('role', 'stagiaire')->delete();
+        \App\Models\FicheStagiaireInvite::query()->delete();
+        \App\Models\AutorisationPointage::query()->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Base de données mise à jour et nettoyée avec succès.'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+    }
+});
+
+// ================================================
 // 🔐 ROUTE LOGIN POUR SANCTUM (ÉVITE L'ERREUR)
 // ================================================
 Route::get('/login', function () {
@@ -81,6 +109,30 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('pointage/decliner-liaison', [AutorisationPointageController::class, 'declinerLiaison']);
     Route::get('pointage/{carnetId}/historique', [PointageController::class, 'historique']);
     Route::post('entreprise/demander-suivi', [AutorisationPointageController::class, 'entrepriseDemande']);
+
+    // Route de secours (Mise à jour BDD + Nettoyage sans terminal)
+    Route::any('debug/clear-stagiaires', function() {
+        try {
+            // 1. Forcer la migration depuis le code
+            \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+
+            // 2. Nettoyage complet (Ordre respectant les contraintes)
+            \App\Models\EntreeCarnet::query()->delete();
+            \App\Models\IndicateurAssiduite::query()->delete();
+            \App\Models\ProgressionCompetence::query()->delete();
+            \App\Models\CarnetDeStage::query()->delete();
+            \App\Models\Stagiaire::query()->delete();
+            \App\Models\User::where('role', 'stagiaire')->delete();
+            \App\Models\FicheStagiaireInvite::query()->delete();
+            \App\Models\AutorisationPointage::query()->delete();
+
+            return response()->json([
+                'message' => 'Succès : La base de données a été mise à jour et tous les stagiaires de test ont été supprimés.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    });
 
     // ============================================
     // PROFIL - Complétion

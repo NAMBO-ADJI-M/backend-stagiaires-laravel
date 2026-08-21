@@ -276,7 +276,7 @@ class AutorisationPointageController extends Controller
     public function declinerLiaison(Request $request)
     {
         $request->validate([
-            'code' => 'required|string|size:6',
+            'code' => 'required|string',
             'entreprise_id' => 'required|uuid|exists:entreprises,id'
         ]);
 
@@ -285,32 +285,15 @@ class AutorisationPointageController extends Controller
         $autorisation = AutorisationPointage::where('stagiaire_id', $stagiaire->id)
             ->where('entreprise_id', $request->entreprise_id)
             ->where('code_validation', $request->code)
-            ->firstOrFail();
-
-        $autorisation->update([
-            'statut' => 'REFUSEE',
-            'code_validation' => null
-        ]);
-
-        return response()->json(['message' => 'Offre déclinée.']);
-    }
-
-    /**
-     * Étape 2 Stagiaire (Option 2) : Décline l'offre de stage.
-     */
-    public function declinerLiaison(Request $request)
-    {
-        $request->validate([
-            'code' => 'required|string|size:6',
-        ]);
-
-        $stagiaire = $request->user()->stagiaire;
-
-        $autorisation = AutorisationPointage::where('stagiaire_id', $stagiaire->id)
-            ->where('code_validation', $request->code)
             ->first();
 
         if (!$autorisation) {
+            // Chercher dans les invitations si c'est un nouveau stagiaire
+            $invit = \App\Models\FicheStagiaireInvite::where('code_invitation', $request->code)->first();
+            if ($invit) {
+                $invit->update(['utilise' => true]); // Marqué comme utilisé pour annuler
+                return response()->json(['message' => 'Offre déclinée.']);
+            }
             return response()->json(['message' => 'Liaison introuvable.'], 404);
         }
 

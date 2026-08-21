@@ -20,7 +20,7 @@ class InvitationStagiaireMail extends Mailable
         public string $entreprise,
         public string $code
     ) {}
- Broadway
+
     /**
      * Get the message envelope.
      */
