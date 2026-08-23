@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AutorisationPointage;
 use App\Models\Stagiaire;
 use App\Models\Entreprise;
+use App\Models\CarnetDeStage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\DemandeSuiviNotification;
@@ -177,9 +178,6 @@ class AutorisationPointageController extends Controller
 
         return response()->json(['message' => 'Code incorrect, déjà utilisé ou expiré.'], 422);
     }
- Broadway
-        return response()->json(['message' => 'Code incorrect ou expiré.'], 422);
-    }
 
     /**
      * Étape 2 Stagiaire : Valide définitivement la liaison.
@@ -192,12 +190,14 @@ class AutorisationPointageController extends Controller
             'stagiaire_date_naissance' => 'required|date',
             'stagiaire_adresse' => 'required|string|max:255',
             'stagiaire_telephone' => 'required|string|max:20',
+            'carnet_id' => 'nullable|uuid|exists:carnets_de_stage,id',
         ]);
 
+        $code = strtoupper(trim($request->code));
         $stagiaire = $request->user()->stagiaire;
 
         // Rechercher si c'est une invitation
-        $invit = \App\Models\FicheStagiaireInvite::where('code_invitation', $request->code)->first();
+        $invit = \App\Models\FicheStagiaireInvite::where('code_invitation', $code)->first();
 
         if ($invit) {
             // Créer l'autorisation réelle à partir du brouillon d'invitation
@@ -228,6 +228,22 @@ class AutorisationPointageController extends Controller
                 ]
             );
 
+            // Rattachement du carnet si fourni
+            if ($request->carnet_id) {
+                $carnet = CarnetDeStage::where('id', $request->carnet_id)
+                    ->where('stagiaire_id', $stagiaire->id)
+                    ->first();
+
+                if ($carnet) {
+                    $carnet->update([
+                        'entreprise_id' => $request->entreprise_id,
+                        'statut' => 'EN_COURS',
+                        'autorisation_suivi' => true,
+                        'date_rattachement' => now(),
+                    ]);
+                }
+            }
+
             $invit->update(['utilise' => true]);
 
             // ENVOI DE LA CONVENTION PAR MAIL
@@ -237,7 +253,7 @@ class AutorisationPointageController extends Controller
         }
 
         // Sinon chercher liaison directe
-        $autorisation = AutorisationPointage::where('code_validation', $request->code)
+        $autorisation = AutorisationPointage::where('code_validation', $code)
             ->where('stagiaire_id', $stagiaire->id)
             ->first();
 
@@ -249,6 +265,22 @@ class AutorisationPointageController extends Controller
                 'statut' => 'ACTIVE',
                 'code_validation' => null
             ]);
+
+            // Rattachement du carnet si fourni
+            if ($request->carnet_id) {
+                $carnet = CarnetDeStage::where('id', $request->carnet_id)
+                    ->where('stagiaire_id', $stagiaire->id)
+                    ->first();
+
+                if ($carnet) {
+                    $carnet->update([
+                        'entreprise_id' => $request->entreprise_id,
+                        'statut' => 'EN_COURS',
+                        'autorisation_suivi' => true,
+                        'date_rattachement' => now(),
+                    ]);
+                }
+            }
 
             // ENVOI DE LA CONVENTION PAR MAIL
             $this->envoyerConventionParMail($autorisation);

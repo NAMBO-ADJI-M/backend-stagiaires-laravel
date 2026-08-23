@@ -17,7 +17,9 @@ class RattachementController extends Controller
             'carnet_id' => 'required|string|exists:carnets_de_stage,id',
         ]);
 
-        $fiche = FicheStagiaireInvite::where('code_invitation', $data['code_invitation'])
+        $code = strtoupper(trim($data['code_invitation']));
+
+        $fiche = FicheStagiaireInvite::where('code_invitation', $code)
             ->where('utilise', false)
             ->where('date_expiration', '>', now())
             ->first();
