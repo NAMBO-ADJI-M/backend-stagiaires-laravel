@@ -160,12 +160,6 @@ class CarnetController extends Controller
             && $user->entreprise
             && $carnet->entreprise_id !== null
             && $carnet->entreprise_id === $user->entreprise->id) {
-
-            // Si la convention est signée, le tuteur n'accède plus à la gestion du carnet
-            if ($carnet->convention && $carnet->convention->statut === 'signee') {
-                abort(403, "L'accès aux réglages du carnet est bloqué car la convention est signée. Veuillez utiliser le module de suivi de présence.");
-            }
-
             return;
         }
 
@@ -180,6 +174,11 @@ class CarnetController extends Controller
     {
         $carnet = CarnetDeStage::findOrFail($carnetId);
         $this->autoriserAccesCarnet($request, $carnet);
+
+        // Si la convention est signée, le tuteur n'accède plus aux stats du carnet
+        if ($request->user()->role === 'entreprise' && $carnet->convention && $carnet->convention->statut === 'signee') {
+            abort(403, "L'accès au carnet est bloqué car la convention est signée.");
+        }
 
         $indicateur = IndicateurAssiduite::where('carnet_id', $carnet->id)->first();
         $joursPresents = $indicateur->jours_presents ?? 0;
@@ -253,6 +252,11 @@ class CarnetController extends Controller
         $carnet = CarnetDeStage::findOrFail($carnetId);
         $this->autoriserAccesCarnet($request, $carnet);
 
+        // Le tuteur ne peut voir les encouragements que si la convention est signée
+        if ($request->user()->role === 'entreprise' && (!$carnet->convention || $carnet->convention->statut !== 'signee')) {
+            abort(403, "La convention doit être signée pour accéder aux encouragements.");
+        }
+
         $notifications = NotificationEncouragement::where('carnet_id', $carnet->id)
             ->orderByDesc('date_envoi')
             ->get();
@@ -267,6 +271,11 @@ class CarnetController extends Controller
     {
         $carnet = CarnetDeStage::findOrFail($carnetId);
         $this->autoriserAccesCarnet($request, $carnet);
+
+        // Le tuteur ne peut encourager que si la convention est signée
+        if (!$carnet->convention || $carnet->convention->statut !== 'signee') {
+            return response()->json(['message' => 'Action impossible. La convention doit être signée par les deux parties.'], 403);
+        }
 
         $validated = $request->validate([
             'type' => 'required|in:ENCOURAGEMENT,FELICITATION',
@@ -297,7 +306,7 @@ class CarnetController extends Controller
 
         // 1. Stagiaires déjà rattachés
         $rattaches = CarnetDeStage::where('entreprise_id', $entrepriseId)
-            ->with(['stagiaire:id,nom,prenom,photo_profil'])
+            ->with(['stagiaire:id,nom,prenom,photo_profil', 'convention'])
             ->orderByDesc('date_rattachement')
             ->get()
             ->map(function($carnet) use ($entrepriseId) {
@@ -310,7 +319,12 @@ class CarnetController extends Controller
                 $joursAttendus = $indicateur->jours_attendus ?? 0;
                 $progression = $joursAttendus > 0 ? ($joursPresents / $joursAttendus) : 0;
 
-                $carnet->autorisation_pointage_statut = $autorisation ? $autorisation->statut : 'INACTIVE';
+                $statut = $autorisation ? $autorisation->statut : 'INACTIVE';
+                if ($carnet->convention && $carnet->convention->statut === 'signee') {
+                    $statut = 'CONVENTION_SIGNEE';
+                }
+
+                $carnet->autorisation_pointage_statut = $statut;
                 $carnet->presence_progress = $progression;
                 $carnet->is_linked = true;
                 return $carnet;
