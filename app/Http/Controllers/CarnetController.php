@@ -160,6 +160,12 @@ class CarnetController extends Controller
             && $user->entreprise
             && $carnet->entreprise_id !== null
             && $carnet->entreprise_id === $user->entreprise->id) {
+
+            // Si la convention est signée, le tuteur n'accède plus à la gestion du carnet
+            if ($carnet->convention && $carnet->convention->statut === 'signee') {
+                abort(403, "L'accès aux réglages du carnet est bloqué car la convention est signée. Veuillez utiliser le module de suivi de présence.");
+            }
+
             return;
         }
 
@@ -404,6 +410,12 @@ class CarnetController extends Controller
         ]);
 
         $entree = EntreeCarnet::findOrFail($entreeId);
+        $carnet = $entree->carnet;
+
+        // Le tuteur ne peut commenter que si la convention est signée
+        if (!$carnet->convention || $carnet->convention->statut !== 'signee') {
+            return response()->json(['message' => 'Action impossible. La convention doit être signée par les deux parties.'], 403);
+        }
 
         // Sécurité : Un tuteur ne peut commenter que ce qu'il voit (donc uniquement les pointages)
         if ($entree->type !== 'PRESENCE') {

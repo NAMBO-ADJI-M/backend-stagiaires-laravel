@@ -25,6 +25,11 @@ class PointageController extends Controller
             ->where('stagiaire_id', $request->user()->stagiaire->id)
             ->firstOrFail();
 
+        // Vérification signature convention
+        if (!$carnet->convention || $carnet->convention->statut !== 'signee') {
+            return response()->json(['message' => 'Pointage impossible. La convention doit être signée par les deux parties.'], 403);
+        }
+
         // Empêche une double arrivée sans départ entre les deux
         $dejaOuverte = EntreeCarnet::where('carnet_id', $carnet->id)
             ->where('type', 'PRESENCE')
@@ -61,6 +66,11 @@ class PointageController extends Controller
         $carnet = CarnetDeStage::where('id', $data['carnet_id'])
             ->where('stagiaire_id', $request->user()->stagiaire->id)
             ->firstOrFail();
+
+        // Vérification signature convention
+        if (!$carnet->convention || $carnet->convention->statut !== 'signee') {
+            return response()->json(['message' => 'Clôture de présence impossible. La convention doit être signée par les deux parties.'], 403);
+        }
 
         $entree = EntreeCarnet::where('carnet_id', $carnet->id)
             ->where('type', 'PRESENCE')
@@ -99,6 +109,11 @@ class PointageController extends Controller
 
         if (!$isProprietaire && !$isTuteurAutorise) {
             return response()->json(['message' => 'Accès refusé au suivi de présence.'], 403);
+        }
+
+        // Règle de signature de convention : Accès au pointage bloqué tant que non signée
+        if (!$carnet->convention || $carnet->convention->statut !== 'signee') {
+            return response()->json(['message' => 'L\'accès au suivi de présence est bloqué. La convention doit être signée par les deux parties.'], 403);
         }
 
         return EntreeCarnet::where('carnet_id', $carnet->id)

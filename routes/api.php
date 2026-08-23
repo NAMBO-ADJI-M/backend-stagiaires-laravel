@@ -20,6 +20,7 @@ use App\Http\Controllers\BilanReflexifController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TestEmailController;
 use App\Http\Controllers\AutorisationPointageController;
+use App\Http\Controllers\ConventionController;
 
 // ================================================
 // 🛠️ ROUTE DE SECOURS (PUBLIC)
@@ -91,6 +92,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('pointage/decliner-liaison', [AutorisationPointageController::class, 'declinerLiaison']);
     Route::get('pointage/{carnetId}/historique', [PointageController::class, 'historique']);
     Route::post('entreprise/demander-suivi', [AutorisationPointageController::class, 'entrepriseDemande']);
+
+    Route::prefix('conventions')->group(function () {
+        Route::post('/', [ConventionController::class, 'store']);
+        Route::post('{id}/valider-tuteur', [ConventionController::class, 'validerParTuteur']);
+        Route::post('{id}/valider-stagiaire', [ConventionController::class, 'validerParStagiaire']);
+    });
 
     Route::middleware('profil:stagiaire')->group(function () {
         Route::post('stagiaire/profil', [AuthController::class, 'completeStagiaireProfile']);
