@@ -24,12 +24,6 @@ class ConventionController extends Controller
             'representant_legal_nom' => 'nullable|string|max:255',
             'representant_legal_fonction' => 'nullable|string|max:255',
             'representant_legal_contact' => 'nullable|string|max:255',
-            // Nouveaux champs Tuteur
-            'tuteur_nom' => 'nullable|string|max:255',
-            'tuteur_prenom' => 'nullable|string|max:255',
-            'tuteur_fonction' => 'nullable|string|max:255',
-            'tuteur_email' => 'nullable|email|max:255',
-            'tuteur_telephone' => 'nullable|string|max:20',
 
             'date_debut' => 'nullable|date',
             'date_fin' => 'nullable|date|after_or_equal:date_debut',
@@ -202,7 +196,6 @@ class ConventionController extends Controller
         $obligatoires = [
             'raison_sociale', 'adresse', 'situation_geographique', 'secteur_activite',
             'representant_legal_nom', 'representant_legal_fonction', 'representant_legal_contact',
-            'tuteur_nom', 'tuteur_prenom', 'tuteur_fonction', 'tuteur_email', 'tuteur_telephone',
             'date_debut', 'date_fin', 'duree_hebdomadaire', 'jours_presence',
             'lieu_execution', 'modalites_suivi', 'entreprise_email', 'entreprise_telephone'
         ];

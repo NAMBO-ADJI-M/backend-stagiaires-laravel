@@ -32,11 +32,7 @@ class Convention extends Model
         'conges_absences',
         'entreprise_email',
         'entreprise_telephone',
-        'tuteur_nom',
-        'tuteur_prenom',
-        'tuteur_fonction',
-        'tuteur_email',
-        'tuteur_telephone',
+
         'stagiaire_nom',
         'stagiaire_prenom',
         'stagiaire_numero',

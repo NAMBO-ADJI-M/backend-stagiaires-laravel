@@ -303,9 +303,6 @@ class AutorisationPointageController extends Controller
                     'entreprise_email' => $entreprise->email,
                     'entreprise_telephone' => $entreprise->telephone,
 
-                    'tuteur_nom' => $autorisation->tuteur_designe,
-                    'tuteur_email' => $autorisation->referent_pedagogique_contact, // Fallback
-
                     'date_debut' => $autorisation->date_debut,
                     'date_fin' => $autorisation->date_fin,
                     'duree_hebdomadaire' => $autorisation->duree_hebdomadaire,
