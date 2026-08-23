@@ -334,7 +334,12 @@ class CarnetController extends Controller
         $disponibles = \App\Models\Stagiaire::whereDoesntHave('carnets', function ($q) {
                 $q->where('statut', 'EN_COURS')->whereNotNull('entreprise_id');
             })
-            ->select('id', 'email', 'nom', 'prenom', 'photo_profil', 'created_at')
+            ->where('profil_complet', true)
+            ->whereNotNull('nom')
+            ->whereNotNull('prenom')
+            ->whereNotNull('ecole')
+            ->whereNotNull('filiere')
+            ->select('id', 'email', 'nom', 'prenom', 'photo_profil', 'ecole', 'filiere', 'created_at')
             ->orderByDesc('created_at')
             ->get()
             ->map(function($stagiaire) {

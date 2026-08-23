@@ -67,7 +67,7 @@ class CarnetDeStage extends Model
 
     public function entrees()
     {
-        return $this->hasMany(EntreeCarnet::class);
+        return $this->hasMany(EntreeCarnet::class, 'carnet_id');
     }
 
     public function progressions()
