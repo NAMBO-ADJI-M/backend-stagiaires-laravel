@@ -215,7 +215,7 @@ class AutorisationPointageController extends Controller
             $autorisation = AutorisationPointage::updateOrCreate(
                 ['stagiaire_id' => $stagiaire->id, 'entreprise_id' => $request->entreprise_id],
                 [
-                    'statut' => 'CONVENTION_SIGNEE',
+                    'statut' => 'ACTIVE',
                     'poste' => $invit->poste,
                     'date_debut' => $invit->date_debut,
                     'date_fin' => $invit->date_fin,
@@ -256,7 +256,7 @@ class AutorisationPointageController extends Controller
                     'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
                     'stagiaire_adresse' => $request->stagiaire_adresse,
                     'stagiaire_telephone' => $request->stagiaire_telephone,
-                    'statut' => 'CONVENTION_SIGNEE',
+                    'statut' => 'ACTIVE',
                     'code_validation' => null
                 ]);
 
@@ -270,7 +270,7 @@ class AutorisationPointageController extends Controller
         if ($autorisation) {
             // ENVOI DE LA CONVENTION PAR MAIL
             $this->envoyerConventionParMail($autorisation);
-            return response()->json(['message' => 'Convention signée et liaison établie !', 'statut' => 'CONVENTION_SIGNEE']);
+            return response()->json(['message' => 'Convention signée et liaison établie !', 'statut' => 'ACTIVE']);
         }
 
         return response()->json(['message' => 'Validation impossible.'], 422);
