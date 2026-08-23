@@ -330,9 +330,6 @@ class AutorisationPointageController extends Controller
         }
     }
 
-        return response()->json(['message' => 'Validation impossible.'], 422);
-    }
-
     /**
      * Génère et envoie la convention PDF au stagiaire et à l'entreprise.
      */
