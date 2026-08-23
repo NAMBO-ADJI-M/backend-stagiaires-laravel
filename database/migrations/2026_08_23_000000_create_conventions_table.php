@@ -42,11 +42,21 @@ return new class extends Migration
             $table->string('entreprise_email');
             $table->string('entreprise_telephone');
 
+            // Informations Tuteur Professionnel (Maître de stage)
+            $table->string('tuteur_nom')->nullable();
+            $table->string('tuteur_prenom')->nullable();
+            $table->string('tuteur_fonction')->nullable();
+            $table->string('tuteur_email')->nullable();
+            $table->string('tuteur_telephone')->nullable();
+
             // Informations stagiaire
             $table->string('stagiaire_nom');
             $table->string('stagiaire_prenom');
             $table->string('stagiaire_numero');
             $table->string('stagiaire_email');
+            $table->string('stagiaire_telephone')->nullable();
+            $table->string('stagiaire_adresse')->nullable();
+            $table->date('stagiaire_date_naissance')->nullable();
             $table->string('stagiaire_etablissement');
             $table->string('stagiaire_annee_academique');
 

@@ -15,10 +15,18 @@ class DocumentController extends Controller
     // Génère la convention de stage au format PDF à partir des données de liaison
     public function genererConvention(Request $request, string $autorisationId)
     {
-        $autorisation = \App\Models\AutorisationPointage::where('id', $autorisationId)
-            ->where('entreprise_id', $request->user()->entreprise->id)
-            ->with(['entreprise', 'stagiaire'])
-            ->firstOrFail();
+        $user = $request->user();
+
+        $query = \App\Models\AutorisationPointage::where('id', $autorisationId);
+
+        // Sécurité : soit c'est l'entreprise liée, soit c'est le stagiaire lié
+        if ($user->role === 'entreprise') {
+            $query->where('entreprise_id', $user->entreprise->id);
+        } else {
+            $query->where('stagiaire_id', $user->stagiaire->id);
+        }
+
+        $autorisation = $query->with(['entreprise', 'stagiaire'])->firstOrFail();
 
         // Récupérer l'URL complète du logo (si présent)
         $logoUrl = $autorisation->entreprise->photo_profil_url;

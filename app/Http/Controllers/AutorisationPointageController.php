@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Convention;
 use App\Models\AutorisationPointage;
 use App\Models\Stagiaire;
 use App\Models\Entreprise;
@@ -195,16 +196,26 @@ class AutorisationPointageController extends Controller
 
         $code = strtoupper(trim($request->code));
         $stagiaire = $request->user()->stagiaire;
+        $entreprise = Entreprise::findOrFail($request->entreprise_id);
+
+        // Mise à jour du profil stagiaire (coordonnées récoltées lors de la signature)
+        $stagiaire->update([
+            'date_naissance' => $request->stagiaire_date_naissance,
+            'domicile_adresse' => $request->stagiaire_adresse,
+            'telephone' => $request->stagiaire_telephone,
+            'profil_complet' => true
+        ]);
 
         // Rechercher si c'est une invitation
         $invit = \App\Models\FicheStagiaireInvite::where('code_invitation', $code)->first();
+        $autorisation = null;
 
         if ($invit) {
             // Créer l'autorisation réelle à partir du brouillon d'invitation
             $autorisation = AutorisationPointage::updateOrCreate(
                 ['stagiaire_id' => $stagiaire->id, 'entreprise_id' => $request->entreprise_id],
                 [
-                    'statut' => 'ACTIVE',
+                    'statut' => 'CONVENTION_SIGNEE',
                     'poste' => $invit->poste,
                     'date_debut' => $invit->date_debut,
                     'date_fin' => $invit->date_fin,
@@ -230,63 +241,94 @@ class AutorisationPointageController extends Controller
 
             // Rattachement du carnet si fourni
             if ($request->carnet_id) {
-                $carnet = CarnetDeStage::where('id', $request->carnet_id)
-                    ->where('stagiaire_id', $stagiaire->id)
-                    ->first();
-
-                if ($carnet) {
-                    $carnet->update([
-                        'entreprise_id' => $request->entreprise_id,
-                        'statut' => 'EN_COURS',
-                        'autorisation_suivi' => true,
-                        'date_rattachement' => now(),
-                    ]);
-                }
+                $this->rattacherCarnetEtCreerConvention($request->carnet_id, $stagiaire, $entreprise, $autorisation, $request);
             }
 
             $invit->update(['utilise' => true]);
+        } else {
+            // Sinon chercher liaison directe
+            $autorisation = AutorisationPointage::where('code_validation', $code)
+                ->where('stagiaire_id', $stagiaire->id)
+                ->first();
 
-            // ENVOI DE LA CONVENTION PAR MAIL
-            $this->envoyerConventionParMail($autorisation);
+            if ($autorisation) {
+                $autorisation->update([
+                    'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
+                    'stagiaire_adresse' => $request->stagiaire_adresse,
+                    'stagiaire_telephone' => $request->stagiaire_telephone,
+                    'statut' => 'CONVENTION_SIGNEE',
+                    'code_validation' => null
+                ]);
 
-            return response()->json(['message' => 'Liaison établie !', 'statut' => 'ACTIVE']);
+                // Rattachement du carnet si fourni
+                if ($request->carnet_id) {
+                    $this->rattacherCarnetEtCreerConvention($request->carnet_id, $stagiaire, $entreprise, $autorisation, $request);
+                }
+            }
         }
 
-        // Sinon chercher liaison directe
-        $autorisation = AutorisationPointage::where('code_validation', $code)
+        if ($autorisation) {
+            // ENVOI DE LA CONVENTION PAR MAIL
+            $this->envoyerConventionParMail($autorisation);
+            return response()->json(['message' => 'Convention signée et liaison établie !', 'statut' => 'CONVENTION_SIGNEE']);
+        }
+
+        return response()->json(['message' => 'Validation impossible.'], 422);
+    }
+
+    /**
+     * Helper pour rattacher le carnet et créer l'enregistrement officiel de la convention.
+     */
+    private function rattacherCarnetEtCreerConvention($carnetId, $stagiaire, $entreprise, $autorisation, $request)
+    {
+        $carnet = CarnetDeStage::where('id', $carnetId)
             ->where('stagiaire_id', $stagiaire->id)
             ->first();
 
-        if ($autorisation) {
-            $autorisation->update([
-                'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
-                'stagiaire_adresse' => $request->stagiaire_adresse,
-                'stagiaire_telephone' => $request->stagiaire_telephone,
-                'statut' => 'ACTIVE',
-                'code_validation' => null
+        if ($carnet) {
+            $carnet->update([
+                'entreprise_id' => $entreprise->id,
+                'statut' => 'EN_COURS',
+                'autorisation_suivi' => true,
+                'date_rattachement' => now(),
             ]);
 
-            // Rattachement du carnet si fourni
-            if ($request->carnet_id) {
-                $carnet = CarnetDeStage::where('id', $request->carnet_id)
-                    ->where('stagiaire_id', $stagiaire->id)
-                    ->first();
+            // Création automatique de la Convention officielle
+            Convention::updateOrCreate(
+                ['carnet_id' => $carnet->id],
+                [
+                    'raison_sociale' => $entreprise->raison_sociale,
+                    'adresse' => $entreprise->adresse_libelle,
+                    'secteur_activite' => $entreprise->secteur,
+                    'entreprise_email' => $entreprise->email,
+                    'entreprise_telephone' => $entreprise->telephone,
 
-                if ($carnet) {
-                    $carnet->update([
-                        'entreprise_id' => $request->entreprise_id,
-                        'statut' => 'EN_COURS',
-                        'autorisation_suivi' => true,
-                        'date_rattachement' => now(),
-                    ]);
-                }
-            }
+                    'tuteur_nom' => $autorisation->tuteur_designe,
+                    'tuteur_email' => $autorisation->referent_pedagogique_contact, // Fallback
 
-            // ENVOI DE LA CONVENTION PAR MAIL
-            $this->envoyerConventionParMail($autorisation);
+                    'date_debut' => $autorisation->date_debut,
+                    'date_fin' => $autorisation->date_fin,
+                    'duree_hebdomadaire' => $autorisation->duree_hebdomadaire,
+                    'jours_presence' => $autorisation->jours_presence,
+                    'lieu_execution' => $autorisation->lieu_execution,
+                    'modalites_suivi' => $autorisation->modalites_suivi_detail,
 
-            return response()->json(['message' => 'Liaison établie !', 'statut' => 'ACTIVE']);
+                    'stagiaire_nom' => $stagiaire->nom,
+                    'stagiaire_prenom' => $stagiaire->prenom,
+                    'stagiaire_email' => $stagiaire->email,
+                    'stagiaire_telephone' => $request->stagiaire_telephone,
+                    'stagiaire_adresse' => $request->stagiaire_adresse,
+                    'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
+                    'stagiaire_etablissement' => $autorisation->etablissement_nom,
+                    'stagiaire_annee_academique' => $autorisation->cursus_rattachement,
+
+                    'statut' => 'signee',
+                    'tuteur_valide_le' => now(), // Considéré validé car le tuteur a généré le code
+                    'stagiaire_valide_le' => now(),
+                ]
+            );
         }
+    }
 
         return response()->json(['message' => 'Validation impossible.'], 422);
     }
