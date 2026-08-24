@@ -241,7 +241,10 @@ class AutorisationPointageController extends Controller
 
             // Rattachement du carnet si fourni
             if ($request->carnet_id) {
-                $this->rattacherCarnetEtCreerConvention($request->carnet_id, $stagiaire, $entreprise, $autorisation, $request);
+                $carnet = CarnetDeStage::find($request->carnet_id);
+                if ($carnet) {
+                    app(\App\Services\RattachementService::class)->rattacherEtSigner($carnet, $entreprise, $autorisation);
+                }
             }
 
             $invit->update(['utilise' => true]);
@@ -262,90 +265,19 @@ class AutorisationPointageController extends Controller
 
                 // Rattachement du carnet si fourni
                 if ($request->carnet_id) {
-                    $this->rattacherCarnetEtCreerConvention($request->carnet_id, $stagiaire, $entreprise, $autorisation, $request);
+                    $carnet = CarnetDeStage::find($request->carnet_id);
+                    if ($carnet) {
+                        app(\App\Services\RattachementService::class)->rattacherEtSigner($carnet, $entreprise, $autorisation);
+                    }
                 }
             }
         }
 
         if ($autorisation) {
-            // ENVOI DE LA CONVENTION PAR MAIL
-            $this->envoyerConventionParMail($autorisation);
             return response()->json(['message' => 'Convention signée et liaison établie !', 'statut' => 'ACTIVE']);
         }
 
         return response()->json(['message' => 'Validation impossible.'], 422);
-    }
-
-    /**
-     * Helper pour rattacher le carnet et créer l'enregistrement officiel de la convention.
-     */
-    private function rattacherCarnetEtCreerConvention($carnetId, $stagiaire, $entreprise, $autorisation, $request)
-    {
-        $carnet = CarnetDeStage::where('id', $carnetId)
-            ->where('stagiaire_id', $stagiaire->id)
-            ->first();
-
-        if ($carnet) {
-            $carnet->update([
-                'entreprise_id' => $entreprise->id,
-                'statut' => 'EN_COURS',
-                'autorisation_suivi' => true,
-                'date_rattachement' => now(),
-            ]);
-
-            // Création automatique de la Convention officielle
-            Convention::updateOrCreate(
-                ['carnet_id' => $carnet->id],
-                [
-                    'raison_sociale' => $entreprise->raison_sociale,
-                    'adresse' => $entreprise->adresse_libelle,
-                    'secteur_activite' => $entreprise->secteur,
-                    'entreprise_email' => $entreprise->email,
-                    'entreprise_telephone' => $entreprise->telephone,
-
-                    'date_debut' => $autorisation->date_debut,
-                    'date_fin' => $autorisation->date_fin,
-                    'duree_hebdomadaire' => $autorisation->duree_hebdomadaire,
-                    'jours_presence' => $autorisation->jours_presence,
-                    'lieu_execution' => $autorisation->lieu_execution,
-                    'modalites_suivi' => $autorisation->modalites_suivi_detail,
-
-                    'stagiaire_nom' => $stagiaire->nom,
-                    'stagiaire_prenom' => $stagiaire->prenom,
-                    'stagiaire_email' => $stagiaire->email,
-                    'stagiaire_telephone' => $request->stagiaire_telephone,
-                    'stagiaire_adresse' => $request->stagiaire_adresse,
-                    'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
-                    'stagiaire_etablissement' => $autorisation->etablissement_nom,
-                    'stagiaire_annee_academique' => $autorisation->cursus_rattachement,
-
-                    'statut' => 'signee',
-                    'tuteur_valide_le' => now(), // Considéré validé car le tuteur a généré le code
-                    'stagiaire_valide_le' => now(),
-                ]
-            );
-        }
-    }
-
-    /**
-     * Génère et envoie la convention PDF au stagiaire et à l'entreprise.
-     */
-    private function envoyerConventionParMail($autorisation)
-    {
-        $autorisation->load(['entreprise', 'stagiaire']);
-
-        try {
-            $mail = new \App\Mail\ConventionSigneeMail($autorisation);
-
-            // 1. Au stagiaire
-            \Illuminate\Support\Facades\Mail::to($autorisation->stagiaire->email)->send($mail);
-
-            // 2. À l'entreprise (tuteur)
-            \Illuminate\Support\Facades\Mail::to($autorisation->entreprise->email)->send($mail);
-
-        } catch (\Exception $e) {
-            \Log::error("Erreur envoi convention PDF par mail : " . $e->getMessage());
-        }
     }
 
     /**
@@ -393,13 +325,31 @@ class AutorisationPointageController extends Controller
             'accepter' => 'required|boolean'
         ]);
 
+        $stagiaire = $request->user()->stagiaire;
         $autorisation = AutorisationPointage::where('id', $request->autorisation_id)
-            ->where('stagiaire_id', $request->user()->stagiaire->id)
+            ->where('stagiaire_id', $stagiaire->id)
             ->firstOrFail();
 
         $autorisation->update([
             'statut' => $request->accepter ? 'ACTIVE' : 'REFUSEE'
         ]);
+
+        // Si acceptation, on tente de rattacher le carnet en attente le plus récent
+        if ($request->accepter) {
+            $carnet = CarnetDeStage::where('stagiaire_id', $stagiaire->id)
+                ->whereNull('entreprise_id')
+                ->where('statut', 'EN_ATTENTE')
+                ->orderByDesc('date_creation')
+                ->first();
+
+            if ($carnet) {
+                app(\App\Services\RattachementService::class)->rattacherEtSigner(
+                    $carnet,
+                    $autorisation->entreprise,
+                    $autorisation
+                );
+            }
+        }
 
         return response()->json([
             'message' => $request->accepter ? 'Demande acceptée.' : 'Demande refusée.',

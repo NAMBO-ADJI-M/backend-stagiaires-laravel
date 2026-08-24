@@ -113,6 +113,16 @@ class PointageController extends Controller
 
         // Règle de signature de convention : Accès au pointage bloqué tant que non signée
         if (!$carnet->convention || $carnet->convention->statut !== 'signee') {
+            // Si c'est le tuteur qui consulte, on renvoie un statut explicite au lieu d'une erreur 403 brute
+            // pour permettre au dashboard de gérer l'affichage "En attente de signature".
+            if ($user->role === 'entreprise') {
+                return response()->json([
+                    'statut' => 'convention_non_signee',
+                    'peut_suivre' => false,
+                    'message' => 'La convention doit être signée par les deux parties pour accéder au suivi.'
+                ], 200);
+            }
+
             return response()->json(['message' => 'L\'accès au suivi de présence est bloqué. La convention doit être signée par les deux parties.'], 403);
         }
 

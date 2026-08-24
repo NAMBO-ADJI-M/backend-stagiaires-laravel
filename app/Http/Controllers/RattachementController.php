@@ -48,13 +48,33 @@ class RattachementController extends Controller
             ]);
         }
 
-        $carnet->update([
-            'entreprise_id' => $fiche->entreprise_id,
-            'code_rattachement_utilise' => $fiche->code_invitation,
-            'date_rattachement' => now(),
-            'autorisation_suivi' => true,
-            'statut' => 'EN_COURS',
-        ]);
+        // Création/Mise à jour de l'autorisation de pointage à partir de la fiche d'invitation
+        $autorisation = \App\Models\AutorisationPointage::updateOrCreate(
+            ['stagiaire_id' => $request->user()->stagiaire->id, 'entreprise_id' => $fiche->entreprise_id],
+            [
+                'statut' => 'ACTIVE',
+                'poste' => $fiche->poste,
+                'date_debut' => $fiche->date_debut,
+                'date_fin' => $fiche->date_fin,
+                'etablissement_nom' => $fiche->etablissement_nom,
+                'tuteur_designe' => $fiche->tuteur_designe,
+                'objet_stage' => $fiche->objet_stage,
+                'cursus_rattachement' => $fiche->cursus_rattachement,
+                'lieu_execution' => $fiche->lieu_execution,
+                'lieu_execution_lat' => $fiche->lieu_execution_lat,
+                'lieu_execution_lng' => $fiche->lieu_execution_lng,
+                'duree_hebdomadaire' => $fiche->duree_hebdomadaire,
+                'jours_presence' => $fiche->jours_presence,
+                'teletravail_modalites' => $fiche->teletravail_modalites,
+                'referent_pedagogique_nom' => $fiche->referent_pedagogique_nom,
+                'referent_pedagogique_contact' => $fiche->referent_pedagogique_contact,
+                'modalites_suivi_detail' => $fiche->modalites_suivi_detail,
+                'conditions_stage' => $fiche->conditions_stage,
+            ]
+        );
+
+        // Appel du service de rattachement pour mettre à jour le carnet et créer la convention
+        app(\App\Services\RattachementService::class)->rattacherEtSigner($carnet, $fiche->entreprise, $autorisation);
 
         $fiche->update([
             'utilise' => true,
@@ -62,7 +82,7 @@ class RattachementController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Carnet rattaché avec succès.',
+            'message' => 'Carnet rattaché et convention générée avec succès.',
             'carnet' => $carnet->fresh(),
         ]);
     }

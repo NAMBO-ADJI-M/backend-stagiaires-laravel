@@ -72,12 +72,12 @@ class CarnetDeStage extends Model
 
     public function progressions()
     {
-        return $this->hasMany(ProgressionCompetence::class);
+        return $this->hasMany(ProgressionCompetence::class, 'carnet_id');
     }
 
     public function indicateurAssiduite()
     {
-        return $this->hasOne(IndicateurAssiduite::class);
+        return $this->hasOne(IndicateurAssiduite::class, 'carnet_id');
     }
 
     public function convention()
