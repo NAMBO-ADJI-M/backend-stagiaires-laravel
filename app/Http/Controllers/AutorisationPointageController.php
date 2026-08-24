@@ -10,6 +10,7 @@ use App\Models\CarnetDeStage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\DemandeSuiviNotification;
+use App\Models\DemandeRattachement;
 
 class AutorisationPointageController extends Controller
 {
@@ -78,6 +79,12 @@ class AutorisationPointageController extends Controller
                 'entreprise_id' => $entreprise->id,
             ])
         );
+
+        // Si une demande de rattachement stagiaire existait, on la marque comme traitée
+        DemandeRattachement::where('stagiaire_id', $validated['stagiaire_id'])
+            ->where('entreprise_id', $entreprise->id)
+            ->where('statut', 'en_attente')
+            ->update(['statut' => 'traitee']);
 
         // Envoyer la notification au stagiaire avec le CODE
         $stagiaire = Stagiaire::find($validated['stagiaire_id']);

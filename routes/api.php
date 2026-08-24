@@ -21,6 +21,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TestEmailController;
 use App\Http\Controllers\AutorisationPointageController;
 use App\Http\Controllers\ConventionController;
+use App\Http\Controllers\DemandeRattachementController;
 
 // ================================================
 // 🛠️ ROUTE DE SECOURS (PUBLIC)
@@ -79,6 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('auth/logout', [AuthController::class, 'logout']);
     Route::post('auth/delete-account', [AuthController::class, 'deleteAccount']);
     Route::get('auth/profile', [AuthController::class, 'profile']);
+    Route::get('entreprises/recherche', [DemandeRattachementController::class, 'recherche']);
     Route::post('user/photo', [AuthController::class, 'updatePhotoProfil']);
     Route::delete('user/photo', [AuthController::class, 'supprimerPhotoProfil']);
     Route::get('notifications', [NotificationController::class, 'index']);
@@ -110,6 +112,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('carnets/{carnetId}/entrees', [CarnetController::class, 'entrees']);
         Route::get('carnets/{carnetId}/encouragements', [CarnetController::class, 'encouragements']);
         Route::post('rattacher-carnet', [RattachementController::class, 'rattacher']);
+        Route::post('rattachement/demander', [DemandeRattachementController::class, 'demander']);
         Route::prefix('pointage')->group(function () {
             Route::post('arrivee', [PointageController::class, 'arrivee']);
             Route::post('depart', [PointageController::class, 'depart']);
@@ -159,6 +162,7 @@ Route::middleware('auth:sanctum')->group(function () {
         });
         Route::get('stagiaires', [CarnetController::class, 'listeEntreprise']);
         Route::get('dashboard-stats', [CarnetController::class, 'statsEntreprise']);
+        Route::get('entreprise/demandes-rattachement', [DemandeRattachementController::class, 'indexEntreprise']);
         Route::post('carnets/{carnetId}/encourager', [CarnetController::class, 'encourager']);
         Route::patch('entrees-carnet/{id}/commentaire', [CarnetController::class, 'commenterEntree']);
         Route::prefix('evaluations-savoir-etre')->group(function () {
