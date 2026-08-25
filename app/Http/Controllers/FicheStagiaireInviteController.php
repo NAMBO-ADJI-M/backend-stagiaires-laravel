@@ -25,18 +25,48 @@ class FicheStagiaireInviteController extends Controller
             'date_debut' => 'required|date',
             'date_fin' => 'required|date|after_or_equal:date_debut',
             'etablissement_nom' => 'nullable|string|max:255',
+
+            // Tuteur (Maître de stage)
             'tuteur_designe' => 'required|string|max:255',
+            'tuteur_nom' => 'nullable|string|max:255',
+            'tuteur_prenom' => 'nullable|string|max:255',
+            'tuteur_fonction' => 'nullable|string|max:255',
+            'tuteur_email' => 'nullable|email|max:255',
+            'tuteur_telephone' => 'nullable|string|max:20',
+
+            // Infos Entreprise Document
+            'raison_sociale_custom' => 'nullable|string|max:255',
+            'adresse_custom' => 'nullable|string|max:255',
+            'situation_geographique' => 'nullable|string|max:255',
+            'secteur_activite_custom' => 'nullable|string|max:255',
+            'entreprise_email_document' => 'nullable|email|max:255',
+            'entreprise_telephone_document' => 'nullable|string|max:20',
+
+            // Représentant Légal
+            'representant_legal_nom' => 'nullable|string|max:255',
+            'representant_legal_fonction' => 'nullable|string|max:255',
+            'representant_legal_contact' => 'nullable|string|max:255',
+
             'objet_stage' => 'nullable|string|max:500',
             'cursus_rattachement' => 'nullable|string|max:255',
+            'stagiaire_annee_academique' => 'nullable|string|max:50',
+
             'lieu_execution' => 'nullable|string|max:255',
             'lieu_execution_lat' => 'nullable|numeric|between:-90,90',
             'lieu_execution_lng' => 'nullable|numeric|between:-180,180',
             'duree_hebdomadaire' => 'nullable|string|max:100',
             'jours_presence' => 'nullable|string|max:255',
             'teletravail_modalites' => 'nullable|string|max:255',
+
             'referent_pedagogique_nom' => 'nullable|string|max:255',
             'referent_pedagogique_contact' => 'nullable|string|max:255',
             'modalites_suivi_detail' => 'nullable|string',
+
+            // Gratification & Congés
+            'gratification_prevue' => 'nullable|boolean',
+            'gratification_montant' => 'nullable|numeric',
+            'gratification_periodicite' => 'nullable|string|max:100',
+            'conges_absences' => 'nullable|string',
             'conditions_stage' => 'nullable|string',
         ]);
 

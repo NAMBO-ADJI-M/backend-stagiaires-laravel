@@ -53,9 +53,32 @@ class AutorisationPointageController extends Controller
             'conditions_stage' => 'nullable|string',
 
             'etablissement_nom' => 'nullable|string|max:255',
+
+            // Tuteur (Maître de stage)
             'tuteur_designe' => 'required|string|max:255',
+            'tuteur_nom' => 'nullable|string|max:255',
+            'tuteur_prenom' => 'nullable|string|max:255',
+            'tuteur_fonction' => 'nullable|string|max:255',
+            'tuteur_email' => 'nullable|email|max:255',
+            'tuteur_telephone' => 'nullable|string|max:20',
+
+            // Infos Entreprise Document
+            'raison_sociale_custom' => 'nullable|string|max:255',
+            'adresse_custom' => 'nullable|string|max:255',
+            'situation_geographique' => 'nullable|string|max:255',
+            'secteur_activite_custom' => 'nullable|string|max:255',
+            'entreprise_email_document' => 'nullable|email|max:255',
+            'entreprise_telephone_document' => 'nullable|string|max:20',
+
+            // Représentant Légal
+            'representant_legal_nom' => 'nullable|string|max:255',
+            'representant_legal_fonction' => 'nullable|string|max:255',
+            'representant_legal_contact' => 'nullable|string|max:255',
+
             'objet_stage' => 'nullable|string|max:500',
             'cursus_rattachement' => 'nullable|string|max:255',
+            'stagiaire_annee_academique' => 'nullable|string|max:50',
+
             'lieu_execution' => 'nullable|string|max:255',
             'lieu_execution_lat' => 'nullable|numeric|between:-90,90',
             'lieu_execution_lng' => 'nullable|numeric|between:-180,180',
@@ -65,6 +88,12 @@ class AutorisationPointageController extends Controller
             'referent_pedagogique_nom' => 'nullable|string|max:255',
             'referent_pedagogique_contact' => 'nullable|string|max:255',
             'modalites_suivi_detail' => 'nullable|string',
+
+            // Gratification & Congés
+            'gratification_prevue' => 'nullable|boolean',
+            'gratification_montant' => 'nullable|numeric',
+            'gratification_periodicite' => 'nullable|string|max:100',
+            'conges_absences' => 'nullable|string',
         ]);
 
         $entreprise = $request->user()->entreprise;
@@ -195,9 +224,12 @@ class AutorisationPointageController extends Controller
         $request->validate([
             'code' => 'required|string',
             'entreprise_id' => 'required|uuid|exists:entreprises,id',
+            'nom' => 'required|string|max:100',
+            'prenom' => 'required|string|max:100',
             'stagiaire_date_naissance' => 'required|date',
             'stagiaire_adresse' => 'required|string|max:255',
             'stagiaire_telephone' => 'required|string|max:20',
+            'stagiaire_annee_academique' => 'nullable|string|max:50',
             'carnet_id' => 'nullable|uuid|exists:carnets_de_stage,id',
         ]);
 
@@ -207,6 +239,8 @@ class AutorisationPointageController extends Controller
 
         // Mise à jour du profil stagiaire (coordonnées récoltées lors de la signature)
         $stagiaire->update([
+            'nom' => $request->nom,
+            'prenom' => $request->prenom,
             'date_naissance' => $request->stagiaire_date_naissance,
             'domicile_adresse' => $request->stagiaire_adresse,
             'telephone' => $request->stagiaire_telephone,
@@ -227,9 +261,34 @@ class AutorisationPointageController extends Controller
                     'date_debut' => $invit->date_debut,
                     'date_fin' => $invit->date_fin,
                     'etablissement_nom' => $invit->etablissement_nom,
+
                     'tuteur_designe' => $invit->tuteur_designe,
+                    'tuteur_nom' => $invit->tuteur_nom,
+                    'tuteur_prenom' => $invit->tuteur_prenom,
+                    'tuteur_fonction' => $invit->tuteur_fonction,
+                    'tuteur_email' => $invit->tuteur_email,
+                    'tuteur_telephone' => $invit->tuteur_telephone,
+
+                    'raison_sociale_custom' => $invit->raison_sociale_custom,
+                    'adresse_custom' => $invit->adresse_custom,
+                    'situation_geographique' => $invit->situation_geographique,
+                    'secteur_activite_custom' => $invit->secteur_activite_custom,
+                    'entreprise_email_document' => $invit->entreprise_email_document,
+                    'entreprise_telephone_document' => $invit->entreprise_telephone_document,
+
+                    'representant_legal_nom' => $invit->representant_legal_nom,
+                    'representant_legal_fonction' => $invit->representant_legal_fonction,
+                    'representant_legal_contact' => $invit->representant_legal_contact,
+
+                    'gratification_prevue' => $invit->gratification_prevue,
+                    'gratification_montant' => $invit->gratification_montant,
+                    'gratification_periodicite' => $invit->gratification_periodicite,
+                    'conges_absences' => $invit->conges_absences,
+
                     'objet_stage' => $invit->objet_stage,
                     'cursus_rattachement' => $invit->cursus_rattachement,
+                    'stagiaire_annee_academique' => $request->stagiaire_annee_academique ?? $invit->stagiaire_annee_academique,
+
                     'lieu_execution' => $invit->lieu_execution,
                     'lieu_execution_lat' => $invit->lieu_execution_lat,
                     'lieu_execution_lng' => $invit->lieu_execution_lng,

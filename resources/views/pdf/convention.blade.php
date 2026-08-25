@@ -31,11 +31,20 @@
 
 <div class="section">
     <div class="section-title">1. Cadre Administratif et Légal</div>
-    <div class="row"><span class="label">Entreprise d'accueil :</span> <strong>{{ $entreprise->raison_sociale }}</strong></div>
-    <div class="row"><span class="label">Le Stagiaire :</span> <strong>{{ $stagiaire->prenom }} {{ $stagiaire->nom }}</strong></div>
-    <div class="row"><span class="label">Date de naissance :</span> {{ $autorisation->stagiaire_date_naissance }}</div>
-    <div class="row"><span class="label">Adresse :</span> {{ $autorisation->stagiaire_adresse }}</div>
-    <div class="row"><span class="label">Établissement de formation :</span> {{ $autorisation->etablissement_nom }}</div>
+    <div class="row"><span class="label">Entreprise d'accueil :</span> <strong>{{ $autorisation->raison_sociale_custom ?? $entreprise->raison_sociale }}</strong></div>
+    <div class="row"><span class="label">Adresse du siège :</span> {{ $autorisation->adresse_custom ?? $entreprise->adresse_libelle }}</div>
+    <div class="row"><span class="label">Situation géographique :</span> {{ $autorisation->situation_geographique ?? 'N/A' }}</div>
+    <div class="row"><span class="label">Secteur d'activité :</span> {{ $autorisation->secteur_activite_custom ?? $entreprise->secteur }}</div>
+
+    <div class="row" style="margin-top: 10px;"><span class="label">Représentant Légal :</span> {{ $autorisation->representant_legal_nom ?? 'Non renseigné' }}</div>
+    <div class="row"><span class="label">Fonction Représentant :</span> {{ $autorisation->representant_legal_fonction ?? 'N/A' }}</div>
+    <div class="row"><span class="label">Contact Représentant :</span> {{ $autorisation->representant_legal_contact ?? 'N/A' }}</div>
+
+    <div class="row" style="margin-top: 10px;"><span class="label">Le Stagiaire :</span> <strong>{{ $stagiaire->prenom }} {{ $stagiaire->nom }}</strong></div>
+    <div class="row"><span class="label">Date de naissance :</span> {{ $autorisation->stagiaire_date_naissance ?? $stagiaire->date_naissance }}</div>
+    <div class="row"><span class="label">Téléphone Stagiaire :</span> {{ $autorisation->stagiaire_telephone ?? $stagiaire->telephone }}</div>
+    <div class="row"><span class="label">Établissement d'étude :</span> {{ $autorisation->etablissement_nom ?? $stagiaire->ecole }}</div>
+    <div class="row"><span class="label">Année académique :</span> {{ $autorisation->stagiaire_annee_academique ?? 'N/A' }}</div>
     <div class="row"><span class="label">Objet du stage :</span> {{ $autorisation->objet_stage }}</div>
     <div class="row"><span class="label">Cursus de rattachement :</span> {{ $autorisation->cursus_rattachement }}</div>
 </div>
@@ -51,16 +60,34 @@
     <div class="row"><span class="label">Durée hebdomadaire :</span> {{ $autorisation->duree_hebdomadaire }}</div>
     <div class="row"><span class="label">Jours de présence :</span> {{ $autorisation->jours_presence }}</div>
     <div class="row"><span class="label">Modalités de télétravail :</span> {{ $autorisation->teletravail_modalites }}</div>
+
+    <div class="row" style="margin-top: 10px;"><span class="label">Gratification :</span>
+        @if($autorisation->gratification_prevue)
+            {{ $autorisation->gratification_montant }} € (Périodicité : {{ $autorisation->gratification_periodicite }})
+        @else
+            Sans gratification
+        @endif
+    </div>
+
+    @if($autorisation->conges_absences)
+        <div class="row"><span class="label">Congés et absences :</span></div>
+        <div class="content"><em>{{ $autorisation->conges_absences }}</em></div>
+    @endif
+
     @if($autorisation->conditions_stage)
-        <div class="row"><span class="label">Gratification et avantages :</span></div>
+        <div class="row"><span class="label">Autres avantages :</span></div>
         <div class="content"><em>{{ $autorisation->conditions_stage }}</em></div>
     @endif
 </div>
 
 <div class="section">
     <div class="section-title">4. Encadrement et Suivi</div>
-    <div class="row"><span class="label">Tuteur Entreprise :</span> {{ $autorisation->tuteur_designe }}</div>
-    <div class="row"><span class="label">Référent Pédagogique :</span> {{ $autorisation->referent_pedagogique_nom }}</div>
+    <div class="row"><span class="label">Maître de stage (Tuteur) :</span> <strong>{{ $autorisation->tuteur_nom ?? $autorisation->tuteur_designe }} {{ $autorisation->tuteur_prenom }}</strong></div>
+    <div class="row"><span class="label">Fonction Tuteur :</span> {{ $autorisation->tuteur_fonction }}</div>
+    <div class="row"><span class="label">Email Tuteur :</span> {{ $autorisation->tuteur_email }}</div>
+    <div class="row"><span class="label">Téléphone Tuteur :</span> {{ $autorisation->tuteur_telephone }}</div>
+
+    <div class="row" style="margin-top: 10px;"><span class="label">Référent Pédagogique :</span> {{ $autorisation->referent_pedagogique_nom }}</div>
     <div class="row"><span class="label">Contact Référent :</span> {{ $autorisation->referent_pedagogique_contact }}</div>
     @if($autorisation->modalites_suivi_detail)
         <div class="row"><span class="label">Détail du suivi :</span></div>

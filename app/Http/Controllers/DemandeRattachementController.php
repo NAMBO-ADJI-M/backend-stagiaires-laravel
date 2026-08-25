@@ -79,7 +79,11 @@ class DemandeRattachementController extends Controller
 
         $demandes = DemandeRattachement::where('entreprise_id', $entreprise->id)
             ->where('statut', 'en_attente')
-            ->with('stagiaire:id,nom,prenom,photo_profil,ecole,filiere')
+            ->with(['stagiaire' => function($query) {
+                // On charge user pour l'accesseur email par sécurité
+                $query->select('id', 'user_id', 'email', 'nom', 'prenom', 'photo_profil', 'ecole', 'filiere')
+                      ->with('user:id,email');
+            }])
             ->orderByDesc('created_at')
             ->get();
 

@@ -11,6 +11,34 @@ class Stagiaire extends Model
 {
     use HasFactory, HasUuids;
 
+    /**
+     * Synchronisation automatique de l'email avec le compte User associé.
+     */
+    protected static function booted()
+    {
+        static::saving(function ($stagiaire) {
+            if ($stagiaire->user_id) {
+                // On s'assure que le profil métier a toujours le même email que le compte d'auth
+                $user = $stagiaire->user ?? \App\Models\User::find($stagiaire->user_id);
+                if ($user) {
+                    $stagiaire->email = $user->email;
+                }
+            }
+        });
+    }
+
+    /**
+     * Accesseur de sécurité : garantit que l'email retourné est celui de l'utilisateur
+     * si l'email local est vide.
+     */
+    public function getEmailAttribute($value)
+    {
+        if (empty($value) && ($this->user_id || $this->relationLoaded('user'))) {
+            return $this->user ? $this->user->email : $value;
+        }
+        return $value;
+    }
+
     protected $fillable = [
         'user_id',
         'email',

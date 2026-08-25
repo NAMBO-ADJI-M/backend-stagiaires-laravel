@@ -80,8 +80,8 @@ class AuthController extends Controller
                 Stagiaire::create([
                     'user_id' => $user->id,
                     'email' => $user->email,
-                    'nom' => 'Utilisateur',
-                    'prenom' => 'StageLink',
+                    'nom' => null,
+                    'prenom' => null,
                     'profil_complet' => false,
                     'carnet_creer' => false,
                 ]);
@@ -292,8 +292,8 @@ class AuthController extends Controller
             Stagiaire::create([
                 'user_id' => $user->id,
                 'email' => $user->email,
-                'nom' => 'Utilisateur',
-                'prenom' => 'StageLink',
+                'nom' => null,
+                'prenom' => null,
                 'profil_complet' => false,
                 'carnet_creer' => false,
             ]);

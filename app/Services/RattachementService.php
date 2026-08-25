@@ -33,11 +33,14 @@ class RattachementService
         $convention = Convention::updateOrCreate(
             ['carnet_id' => $carnet->id],
             [
-                'raison_sociale' => $entreprise->raison_sociale,
-                'adresse' => $entreprise->adresse_libelle,
-                'secteur_activite' => $entreprise->secteur,
-                'entreprise_email' => $entreprise->email,
-                'entreprise_telephone' => $entreprise->telephone,
+                'raison_sociale' => $autorisation->raison_sociale_custom ?? $entreprise->raison_sociale,
+                'adresse' => $autorisation->adresse_custom ?? $entreprise->adresse_libelle,
+                'situation_geographique' => $autorisation->situation_geographique,
+                'secteur_activite' => $autorisation->secteur_activite_custom ?? $entreprise->secteur,
+
+                'representant_legal_nom' => $autorisation->representant_legal_nom,
+                'representant_legal_fonction' => $autorisation->representant_legal_fonction,
+                'representant_legal_contact' => $autorisation->representant_legal_contact,
 
                 'date_debut' => $autorisation->date_debut,
                 'date_fin' => $autorisation->date_fin,
@@ -46,14 +49,29 @@ class RattachementService
                 'lieu_execution' => $autorisation->lieu_execution,
                 'modalites_suivi' => $autorisation->modalites_suivi_detail,
 
+                'gratification_prevue' => $autorisation->gratification_prevue,
+                'gratification_montant' => $autorisation->gratification_montant,
+                'gratification_periodicite' => $autorisation->gratification_periodicite,
+                'conges_absences' => $autorisation->conges_absences,
+
+                'entreprise_email' => $autorisation->entreprise_email_document ?? $entreprise->email,
+                'entreprise_telephone' => $autorisation->entreprise_telephone_document ?? $entreprise->telephone,
+
+                'tuteur_nom' => $autorisation->tuteur_nom ?? $autorisation->tuteur_designe,
+                'tuteur_prenom' => $autorisation->tuteur_prenom,
+                'tuteur_fonction' => $autorisation->tuteur_fonction,
+                'tuteur_email' => $autorisation->tuteur_email ?? $autorisation->referent_pedagogique_contact,
+                'tuteur_telephone' => $autorisation->tuteur_telephone,
+
                 'stagiaire_nom' => $stagiaire->nom,
                 'stagiaire_prenom' => $stagiaire->prenom,
+                'stagiaire_numero' => $stagiaire->telephone,
                 'stagiaire_email' => $stagiaire->email,
                 'stagiaire_telephone' => $stagiaire->telephone,
                 'stagiaire_adresse' => $stagiaire->domicile_adresse,
                 'stagiaire_date_naissance' => $stagiaire->date_naissance,
                 'stagiaire_etablissement' => $autorisation->etablissement_nom,
-                'stagiaire_annee_academique' => $autorisation->cursus_rattachement,
+                'stagiaire_annee_academique' => $autorisation->stagiaire_annee_academique ?? $autorisation->cursus_rattachement,
 
                 'statut' => 'signee',
                 'tuteur_valide_le' => $autorisation->created_at ?? now(),
