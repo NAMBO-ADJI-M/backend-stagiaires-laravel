@@ -100,12 +100,14 @@ class AutorisationPointageController extends Controller
 
         $code = strtoupper(\Illuminate\Support\Str::random(8));
 
+        // Note : Le rattachement concerne l'autorisation de présence et le suivi du stagiaire (et non son carnet personnel)
         $autorisation = AutorisationPointage::updateOrCreate(
             ['stagiaire_id' => $validated['stagiaire_id'], 'entreprise_id' => $entreprise->id],
             array_merge($validated, [
                 'statut' => 'EN_ATTENTE',
                 'code_validation' => $code,
                 'entreprise_id' => $entreprise->id,
+                'tuteur_valide_le' => now(), // 1. Signature / validation initiale par le tuteur
             ])
         );
 
@@ -252,11 +254,12 @@ class AutorisationPointageController extends Controller
         $autorisation = null;
 
         if ($invit) {
-            // Créer l'autorisation réelle à partir du brouillon d'invitation
+            // Créer l'autorisation réelle de suivi à partir du brouillon d'invitation
             $autorisation = AutorisationPointage::updateOrCreate(
                 ['stagiaire_id' => $stagiaire->id, 'entreprise_id' => $request->entreprise_id],
                 [
-                    'statut' => 'ACTIVE',
+                    'statut' => 'CONVENTION_SIGNEE',
+                    'carnet_id' => $request->carnet_id,
                     'poste' => $invit->poste,
                     'date_debut' => $invit->date_debut,
                     'date_fin' => $invit->date_fin,
@@ -302,6 +305,10 @@ class AutorisationPointageController extends Controller
                     'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
                     'stagiaire_adresse' => $request->stagiaire_adresse,
                     'stagiaire_telephone' => $request->stagiaire_telephone,
+
+                    // 2. Signatures numériques horodatées
+                    'tuteur_valide_le' => $invit->created_at ?? now(),
+                    'stagiaire_valide_le' => now(),
                 ]
             );
 
@@ -322,10 +329,13 @@ class AutorisationPointageController extends Controller
 
             if ($autorisation) {
                 $autorisation->update([
+                    'carnet_id' => $request->carnet_id,
                     'stagiaire_date_naissance' => $request->stagiaire_date_naissance,
                     'stagiaire_adresse' => $request->stagiaire_adresse,
                     'stagiaire_telephone' => $request->stagiaire_telephone,
-                    'statut' => 'ACTIVE',
+                    'stagiaire_valide_le' => now(),
+                    'tuteur_valide_le' => $autorisation->tuteur_valide_le ?? $autorisation->created_at ?? now(),
+                    'statut' => 'CONVENTION_SIGNEE',
                     'code_validation' => null
                 ]);
 
@@ -340,7 +350,11 @@ class AutorisationPointageController extends Controller
         }
 
         if ($autorisation) {
-            return response()->json(['message' => 'Convention signée et liaison établie !', 'statut' => 'ACTIVE']);
+            return response()->json([
+                'message' => 'Convention signée et liaison établie !',
+                'statut' => 'CONVENTION_SIGNEE',
+                'autorisation_id' => $autorisation->id,
+            ]);
         }
 
         return response()->json(['message' => 'Validation impossible.'], 422);

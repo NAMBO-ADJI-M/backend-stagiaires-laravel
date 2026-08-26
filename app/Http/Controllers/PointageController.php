@@ -42,6 +42,19 @@ class PointageController extends Controller
             ]);
         }
 
+        // Requalification automatique : si la dernière entrée terminée était en attente (ou sortie récente),
+        // ce retour confirme qu'il s'agissait d'une pause.
+        $derniereSortieEnAttente = EntreeCarnet::where('carnet_id', $carnet->id)
+            ->where('type', 'PRESENCE')
+            ->whereNotNull('date_fin')
+            ->where('statut_cloture', 'EN_ATTENTE')
+            ->latest('date_fin')
+            ->first();
+
+        if ($derniereSortieEnAttente) {
+            $derniereSortieEnAttente->update(['statut_cloture' => 'PAUSE_CONFIRMEE']);
+        }
+
         $entree = EntreeCarnet::create([
             'carnet_id' => $carnet->id,
             'type' => 'PRESENCE',
@@ -56,7 +69,7 @@ class PointageController extends Controller
         return response()->json($entree, 201);
     }
 
-    // Marque un départ : referme la présence en cours (date_fin)
+    // Marque un départ : referme la présence en cours (date_fin) avec statut EN_ATTENTE
     public function depart(Request $request)
     {
         $data = $request->validate([
@@ -84,9 +97,64 @@ class PointageController extends Controller
             ]);
         }
 
-        $entree->update(['date_fin' => now()]);
+        $entree->update([
+            'date_fin' => now(),
+            'statut_cloture' => 'EN_ATTENTE',
+        ]);
 
         return response()->json($entree->fresh());
+    }
+
+    // Confirmation explicite de pause (via notification ou bouton in-app)
+    public function confirmerPause(Request $request)
+    {
+        $data = $request->validate([
+            'carnet_id' => 'required|string|exists:carnets_de_stage,id',
+        ]);
+
+        $carnet = CarnetDeStage::where('id', $data['carnet_id'])
+            ->where('stagiaire_id', $request->user()->stagiaire->id)
+            ->firstOrFail();
+
+        $entree = EntreeCarnet::where('carnet_id', $carnet->id)
+            ->where('type', 'PRESENCE')
+            ->whereNotNull('date_fin')
+            ->where('statut_cloture', 'EN_ATTENTE')
+            ->latest('date_fin')
+            ->first();
+
+        if ($entree) {
+            $entree->update(['statut_cloture' => 'PAUSE_CONFIRMEE']);
+            return response()->json(['message' => 'Pause confirmée avec succès.', 'entree' => $entree->fresh()]);
+        }
+
+        return response()->json(['message' => 'Aucune sortie en attente à passer en pause.'], 200);
+    }
+
+    // Confirmation explicite de fin de journée / départ définitif
+    public function confirmerDepart(Request $request)
+    {
+        $data = $request->validate([
+            'carnet_id' => 'required|string|exists:carnets_de_stage,id',
+        ]);
+
+        $carnet = CarnetDeStage::where('id', $data['carnet_id'])
+            ->where('stagiaire_id', $request->user()->stagiaire->id)
+            ->firstOrFail();
+
+        $entree = EntreeCarnet::where('carnet_id', $carnet->id)
+            ->where('type', 'PRESENCE')
+            ->whereNotNull('date_fin')
+            ->where('statut_cloture', 'EN_ATTENTE')
+            ->latest('date_fin')
+            ->first();
+
+        if ($entree) {
+            $entree->update(['statut_cloture' => 'DEPART_CONFIRME']);
+            return response()->json(['message' => 'Départ définitif confirmé avec succès.', 'entree' => $entree->fresh()]);
+        }
+
+        return response()->json(['message' => 'Aucune sortie en attente à clôturer.'], 200);
     }
 
     // Liste les entrées de présence d'un carnet (pour vérifier visuellement)
@@ -102,9 +170,10 @@ class PointageController extends Controller
         if ($user->role === 'entreprise') {
             $autorisation = \App\Models\AutorisationPointage::where('stagiaire_id', $carnet->stagiaire_id)
                 ->where('entreprise_id', $user->entreprise->id)
-                ->where('statut', 'ACTIVE')
+                ->whereIn('statut', ['ACTIVE', 'CONVENTION_SIGNEE'])
+                ->where('carnet_id', $carnet->id)
                 ->exists();
-            $isTuteurAutorise = $autorisation && ($carnet->entreprise_id === $user->entreprise->id);
+            $isTuteurAutorise = (bool) $autorisation;
         }
 
         if (!$isProprietaire && !$isTuteurAutorise) {

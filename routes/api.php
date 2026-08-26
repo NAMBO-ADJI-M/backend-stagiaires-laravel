@@ -116,6 +116,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('pointage')->group(function () {
             Route::post('arrivee', [PointageController::class, 'arrivee']);
             Route::post('depart', [PointageController::class, 'depart']);
+            Route::post('confirmer-pause', [PointageController::class, 'confirmerPause']);
+            Route::post('confirmer-depart', [PointageController::class, 'confirmerDepart']);
         });
         Route::get('mes-attestations', [DocumentController::class, 'mesAttestations']);
         Route::get('attestations/{attestationId}/telecharger', [DocumentController::class, 'telechargerAttestation']);
@@ -142,6 +144,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('trajets/{trajetId}/signaler', [SignalementController::class, 'store']);
     });
 
+    Route::get('documents/liaison/{autorisationId}/convention-pdf', [DocumentController::class, 'genererConvention']);
+
     Route::middleware('profil:entreprise')->group(function () {
         Route::post('entreprise/profil', [AuthController::class, 'completeEntrepriseProfile']);
         Route::prefix('fiches-invitation')->group(function () {
@@ -153,7 +157,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('carnets/{carnetId}/evaluations', [EvaluationController::class, 'index']);
         });
         Route::prefix('documents')->group(function () {
-            Route::get('liaison/{autorisationId}/convention-pdf', [DocumentController::class, 'genererConvention']);
             Route::post('evaluations/{evaluationId}/attestation', [DocumentController::class, 'genererAttestation']);
             Route::post('evaluations/{evaluationId}/carte-appui', [DocumentController::class, 'genererCarteAppui']);
         });

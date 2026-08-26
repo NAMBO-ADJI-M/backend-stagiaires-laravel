@@ -17,6 +17,7 @@ class AutorisationPointage extends Model
         'stagiaire_adresse',
         'stagiaire_telephone',
         'entreprise_id',
+        'carnet_id',
         'statut',
         'code_validation',
         'poste',
@@ -36,6 +37,13 @@ class AutorisationPointage extends Model
         'referent_pedagogique_nom',
         'referent_pedagogique_contact',
         'modalites_suivi_detail',
+        'tuteur_valide_le',
+        'stagiaire_valide_le',
+    ];
+
+    protected $casts = [
+        'tuteur_valide_le' => 'datetime',
+        'stagiaire_valide_le' => 'datetime',
     ];
 
     public function stagiaire()

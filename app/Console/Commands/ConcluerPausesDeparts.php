@@ -24,13 +24,9 @@ class ConcluerPausesDeparts extends Command
 
         foreach ($entreesEnAttente as $entree) {
             $entreprise = $entree->carnet?->entreprise;
-
-            if (!$entreprise || !$entreprise->heure_fin_journee) {
-                continue; // pas d'horaires configurés, on ne peut pas conclure
-            }
-
-            $heureActuelle = Carbon::now()->format('H:i:s');
-            $heureFinJournee = $entreprise->heure_fin_journee;
+            $now = Carbon::now();
+            $dateFin = Carbon::parse($entree->date_fin);
+            $minutesDepuisSortie = $dateFin->diffInMinutes($now);
 
             // Y a-t-il eu un retour dans le rayon après cette sortie ?
             $retourConstate = EntreeCarnet::where('carnet_id', $entree->carnet_id)
@@ -38,19 +34,22 @@ class ConcluerPausesDeparts extends Command
                 ->where('date_debut', '>', $entree->date_fin)
                 ->exists();
 
-            $sortieDansPlagePause = $entreprise->pause_heure_debut
-                && $entreprise->pause_heure_fin
-                && Carbon::parse($entree->date_fin)->format('H:i:s') >= $entreprise->pause_heure_debut
-                && Carbon::parse($entree->date_fin)->format('H:i:s') <= $entreprise->pause_heure_fin;
-
-            if ($heureActuelle >= $heureFinJournee && !$retourConstate) {
-                $entree->update(['statut_cloture' => 'DEPART_CONFIRME']);
-                $nbDepart++;
-            } elseif ($sortieDansPlagePause && $retourConstate) {
+            if ($retourConstate) {
                 $entree->update(['statut_cloture' => 'PAUSE_CONFIRMEE']);
                 $nbPause++;
+                continue;
             }
-            // sinon : on ne conclut rien, on attend le prochain passage
+
+            $heureActuelle = $now->format('H:i:s');
+            $heureFinJournee = $entreprise?->heure_fin_journee;
+
+            // Clôture en départ si :
+            // 1. Plus de 45 minutes sans retour
+            // 2. Ou l'heure de fin de journée de l'entreprise est atteinte/dépassée
+            if ($minutesDepuisSortie >= 45 || ($heureFinJournee && $heureActuelle >= $heureFinJournee)) {
+                $entree->update(['statut_cloture' => 'DEPART_CONFIRME']);
+                $nbDepart++;
+            }
         }
 
         $this->info("Traitement terminé : {$nbPause} pause(s) confirmée(s), {$nbDepart} départ(s) confirmé(s).");

@@ -14,22 +14,29 @@ use App\Mail\ConventionSigneeMail;
 class RattachementService
 {
     /**
-     * Effectue le rattachement complet d'un carnet à une entreprise
-     * et génère la convention signée, puis envoie les emails.
+     * Effectue le rattachement de la présence/du suivi du stagiaire à une entreprise
+     * et génère la convention signée avec les dates de validation effectives, puis envoie les emails.
+     * Note : Le rattachement concerne l'autorisation de présence du stagiaire (et non son carnet personnel).
      */
     public function rattacherEtSigner(CarnetDeStage $carnet, Entreprise $entreprise, AutorisationPointage $autorisation)
     {
         $stagiaire = $carnet->stagiaire;
 
-        // 1. Mise à jour du carnet
+        // 1. Mise à jour de l'autorisation de présence (le rattachement concerne la présence)
+        $autorisation->update([
+            'carnet_id' => $carnet->id,
+            'statut' => 'CONVENTION_SIGNEE',
+            'tuteur_valide_le' => $autorisation->tuteur_valide_le ?? $autorisation->created_at ?? now(),
+            'stagiaire_valide_le' => $autorisation->stagiaire_valide_le ?? now(),
+        ]);
+
+        // 2. Le carnet reste la propriété du stagiaire, on active juste le suivi
         $carnet->update([
-            'entreprise_id' => $entreprise->id,
-            'statut' => 'EN_COURS',
             'autorisation_suivi' => true,
             'date_rattachement' => now(),
         ]);
 
-        // 2. Création/Mise à jour de la Convention officielle
+        // 3. Création/Mise à jour de la Convention officielle
         $convention = Convention::updateOrCreate(
             ['carnet_id' => $carnet->id],
             [
@@ -74,20 +81,15 @@ class RattachementService
                 'stagiaire_annee_academique' => $autorisation->stagiaire_annee_academique ?? $autorisation->cursus_rattachement,
 
                 'statut' => 'signee',
-                'tuteur_valide_le' => $autorisation->created_at ?? now(),
-                'stagiaire_valide_le' => now(),
+                'tuteur_valide_le' => $autorisation->tuteur_valide_le ?? $autorisation->created_at ?? now(),
+                'stagiaire_valide_le' => $autorisation->stagiaire_valide_le ?? now(),
             ]
         );
-
-        // 3. Passage de l'autorisation à ACTIVE si ce n'est pas déjà fait
-        if ($autorisation->statut !== 'ACTIVE' && $autorisation->statut !== 'CONVENTION_SIGNEE') {
-            $autorisation->update(['statut' => 'ACTIVE']);
-        }
 
         // 4. Envoi de la convention par mail
         $this->envoyerConventionParMail($autorisation);
 
-        Log::info("Rattachement et signature convention effectués pour carnet {$carnet->id}");
+        Log::info("Rattachement présence et signature convention effectués pour carnet {$carnet->id}");
 
         return $convention;
     }
