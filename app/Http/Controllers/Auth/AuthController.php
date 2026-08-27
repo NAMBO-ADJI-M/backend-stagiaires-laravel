@@ -20,15 +20,13 @@ use Carbon\Carbon;
 class AuthController extends Controller
 {
     /**
-     * 1️⃣ DEMANDE DE CODE - CRÉATION AUTO SI COMPTE N'EXISTE PAS
-     * Plus de mot de passe : email + rôle suffisent, un code est toujours envoyé,
-     * que le compte soit nouveau ou déjà existant.
+     * 1️⃣ LOGIN / REGISTER UNIQUE - DEMANDE DE CODE
+     * Gère la création, la restauration (soft delete) et la connexion.
      */
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
-            'role' => 'required|in:stagiaire,entreprise',
         ]);
 
         if ($validator->fails()) {
@@ -39,89 +37,68 @@ class AuthController extends Controller
         }
 
         $email = strtolower(trim($request->email));
-        $role = $request->role;
 
-        $user = User::where('email', $email)->first();
-        $isNewAccount = false;
+        // 🔍 Rechercher l'utilisateur, y compris ceux supprimés (soft delete)
+        $user = User::withTrashed()->where('email', $email)->first();
 
-        // ⚠️ Vérifier si l'utilisateur existe déjà sous un autre rôle ou est inactif
+        $isNewUser = false;
+        $wasRestored = false;
+
         if ($user) {
-            if (!$user->is_active) {
-                return response()->json([
-                    'message' => '❌ Ce compte est désactivé. Veuillez contacter l\'administrateur.',
-                    'errors' => ['email' => ['Compte inactif ou désactivé.']]
-                ], 403);
+            // ♻️ Si l'utilisateur était supprimé, on le restaure
+            if ($user->trashed()) {
+                $user->restore();
+                $wasRestored = true;
+                Log::info("♻️ Utilisateur restauré : {$email}");
             }
-
-            if ($user->role !== $role) {
-                return response()->json([
-                    'message' => "❌ Cet email est déjà associé à un compte « {$user->role} ». Veuillez choisir le profil « {$user->role} » pour vous connecter.",
-                    'errors' => ['role' => ["Le profil sélectionné ne correspond pas au compte existant ({$user->role})."]]
-                ], 422);
-            }
-        }
-
-        // ✅ SI LE COMPTE N'EXISTE PAS → LE CRÉER
-        if (!$user) {
-            $isNewAccount = true;
-
+        } else {
+            // ✨ Nouvel utilisateur : création
             $user = User::create([
                 'email' => $email,
-                // Le mot de passe n'est plus utilisé pour l'authentification.
-                // La colonne reste NOT NULL en base : on y met une valeur
-                // aléatoire technique, jamais communiquée ni vérifiée.
                 'password' => Hash::make(Str::random(40)),
-                'role' => $role,
+                'role' => 'stagiaire', // Rôle par défaut
                 'is_active' => true,
             ]);
-
-            // Créer le profil selon le rôle
-            if ($role === 'stagiaire') {
-                Stagiaire::create([
-                    'user_id' => $user->id,
-                    'email' => $user->email,
-                    'nom' => null,
-                    'prenom' => null,
-                    'profil_complet' => false,
-                    'carnet_creer' => false,
-                ]);
-            } else {
-                Entreprise::create([
-                    'user_id' => $user->id,
-                    'email' => $user->email,
-                    'raison_sociale' => 'Mon Entreprise',
-                    'profil_complet' => false,
-                ]);
-            }
+            $isNewUser = true;
+            Log::info("✨ Nouvel utilisateur créé : {$email}");
         }
 
-        // ✅ DANS TOUS LES CAS (nouveau compte ou compte existant) → ENVOYER UN CODE
-        $code = $this->generateCode($user->email);
+        // 🛑 Vérifier si le compte est désactivé (indépendant du soft delete)
+        if (!$user->is_active) {
+            return response()->json([
+                'message' => '❌ Ce compte est désactivé. Veuillez contacter l\'administrateur.',
+                'errors' => ['email' => ['Compte inactif ou désactivé.']]
+            ], 403);
+        }
+
+        // 🧹 Invalider les anciens codes non utilisés
+        VerificationCode::where('email', $email)->where('used', false)->delete();
+
+        // 🔑 Générer un nouveau code
+        $code = $this->generateCode($email);
 
         try {
-            $this->sendVerificationEmail($user->email, $code);
+            $this->sendVerificationEmail($email, $code);
         } catch (\Exception $e) {
-            Log::error("❌ Erreur d'envoi OTP Brevo à {$user->email}: " . $e->getMessage());
+            Log::error("❌ Erreur d'envoi OTP à {$email}: " . $e->getMessage());
             return response()->json([
-                'message' => '❌ Impossible d\'envoyer le code de vérification par email.',
-                'error' => $e->getMessage(),
-                'hint' => 'Vérifiez la configuration Brevo / SMTP dans les variables d\'environnement.'
+                'message' => '❌ Impossible d\'envoyer le code de vérification.',
+                'error' => $e->getMessage()
             ], 500);
         }
 
         return response()->json([
-            'message' => $isNewAccount
-                ? '✅ Compte créé avec succès ! Un code de vérification a été envoyé à votre email.'
-                : '📧 Un code de vérification a été envoyé à votre email.',
+            'message' => $isNewUser
+                ? '✅ Compte créé ! Un code de vérification a été envoyé.'
+                : ($wasRestored ? '♻️ Compte réactivé ! Un code de vérification a été envoyé.' : '📧 Un code de vérification a été envoyé.'),
             'data' => [
-                'email' => $user->email,
-                'role' => $user->role,
+                'email' => $email,
+                'is_new_user' => $isNewUser,
+                'was_restored' => $wasRestored,
                 'requires_verification' => true,
-                'code_sent' => true,
-                'code_expires_in' => 900,
-                'is_new_account' => $isNewAccount,
+                'code_expires_in' => 600,
             ]
-        ], $isNewAccount ? 201 : 200);
+        ], $isNewUser ? 201 : 200);
     }
 
     /**
@@ -560,7 +537,7 @@ class AuthController extends Controller
             'code' => $code,
             'type' => 'registration',
             'used' => false,
-            'expires_at' => Carbon::now()->addMinutes(15),
+            'expires_at' => Carbon::now()->addMinutes(10),
         ]);
 
         return $code;
