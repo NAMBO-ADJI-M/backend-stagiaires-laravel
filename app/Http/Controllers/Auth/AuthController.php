@@ -49,7 +49,21 @@ class AuthController extends Controller
             if ($user->trashed()) {
                 $user->restore();
                 $wasRestored = true;
-                Log::info("♻️ Utilisateur restauré : {$email}");
+
+                // Restaurer également le profil associé s'il existe et est supprimé
+                if ($user->role === 'stagiaire') {
+                    $profil = Stagiaire::withTrashed()->where('user_id', $user->id)->first();
+                    if ($profil && $profil->trashed()) {
+                        $profil->restore();
+                    }
+                } elseif ($user->role === 'entreprise') {
+                    $profil = Entreprise::withTrashed()->where('user_id', $user->id)->first();
+                    if ($profil && $profil->trashed()) {
+                        $profil->restore();
+                    }
+                }
+
+                Log::info("♻️ Utilisateur et profil restaurés : {$email}");
             }
         } else {
             // ✨ Nouvel utilisateur : création
@@ -63,12 +77,9 @@ class AuthController extends Controller
             Log::info("✨ Nouvel utilisateur créé : {$email}");
         }
 
-        // 🛑 Vérifier si le compte est désactivé (indépendant du soft delete)
+        // 🛑 S'assurer que le compte est actif (indépendant du soft delete)
         if (!$user->is_active) {
-            return response()->json([
-                'message' => '❌ Ce compte est désactivé. Veuillez contacter l\'administrateur.',
-                'errors' => ['email' => ['Compte inactif ou désactivé.']]
-            ], 403);
+            $user->update(['is_active' => true]);
         }
 
         // 🧹 Invalider les anciens codes non utilisés
@@ -264,24 +275,34 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        // Auto-création défensive du profil si manquant
-        if ($user->role === 'stagiaire' && !$user->stagiaire) {
-            Stagiaire::create([
-                'user_id' => $user->id,
-                'email' => $user->email,
-                'nom' => null,
-                'prenom' => null,
-                'profil_complet' => false,
-                'carnet_creer' => false,
-            ]);
+        // Auto-restauration ou création défensive du profil si manquant
+        if ($user->role === 'stagiaire') {
+            $stagiaire = Stagiaire::withTrashed()->where('user_id', $user->id)->first();
+            if ($stagiaire && $stagiaire->trashed()) {
+                $stagiaire->restore();
+            } elseif (!$stagiaire) {
+                Stagiaire::create([
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'nom' => null,
+                    'prenom' => null,
+                    'profil_complet' => false,
+                    'carnet_creer' => false,
+                ]);
+            }
             $user->load('stagiaire');
-        } elseif ($user->role === 'entreprise' && !$user->entreprise) {
-            Entreprise::create([
-                'user_id' => $user->id,
-                'email' => $user->email,
-                'raison_sociale' => 'Mon Entreprise',
-                'profil_complet' => false,
-            ]);
+        } elseif ($user->role === 'entreprise') {
+            $entreprise = Entreprise::withTrashed()->where('user_id', $user->id)->first();
+            if ($entreprise && $entreprise->trashed()) {
+                $entreprise->restore();
+            } elseif (!$entreprise) {
+                Entreprise::create([
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'raison_sociale' => 'Mon Entreprise',
+                    'profil_complet' => false,
+                ]);
+            }
             $user->load('entreprise');
         }
 

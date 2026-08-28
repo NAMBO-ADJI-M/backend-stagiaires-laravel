@@ -112,6 +112,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('carnets/{carnetId}/entrees', [CarnetController::class, 'entrees']);
         Route::get('carnets/{carnetId}/encouragements', [CarnetController::class, 'encouragements']);
         Route::post('rattacher-carnet', [RattachementController::class, 'rattacher']);
+        Route::get('rattachement/statut', [DemandeRattachementController::class, 'checkStatus']);
         Route::post('rattachement/demander', [DemandeRattachementController::class, 'demander']);
         Route::prefix('pointage')->group(function () {
             Route::post('arrivee', [PointageController::class, 'arrivee']);

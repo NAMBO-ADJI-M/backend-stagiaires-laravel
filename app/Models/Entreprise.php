@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\User;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Entreprise extends Model
 {
-    use HasFactory, HasUuids, HasApiTokens;
+    use HasFactory, HasUuids, HasApiTokens, SoftDeletes;
 
     protected $table = 'entreprises';
     public $timestamps = false;

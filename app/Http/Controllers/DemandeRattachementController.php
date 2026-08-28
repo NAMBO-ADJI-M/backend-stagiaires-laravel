@@ -27,6 +27,25 @@ class DemandeRattachementController extends Controller
     }
 
     /**
+     * Vérifier si le stagiaire a au moins une demande de rattachement.
+     */
+    public function checkStatus(Request $request)
+    {
+        $stagiaire = $request->user()->stagiaire;
+
+        if (!$stagiaire) {
+            return response()->json(['message' => 'Profil stagiaire non trouvé.'], 404);
+        }
+
+        $count = DemandeRattachement::where('stagiaire_id', $stagiaire->id)->count();
+
+        return response()->json([
+            'has_rattachement' => $count > 0,
+            'count' => $count
+        ]);
+    }
+
+    /**
      * Le stagiaire demande un rattachement à une entreprise.
      */
     public function demander(Request $request)
