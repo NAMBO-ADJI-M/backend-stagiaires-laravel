@@ -14,37 +14,81 @@ class PointageController extends Controller
     public function arrivee(Request $request)
     {
         $data = $request->validate([
-            'carnet_id' => 'required|string|exists:carnets_de_stage,id',
+            'carnet_id' => 'nullable|string|exists:carnets_de_stage,id',
+            'autorisation_pointage_id' => 'nullable|string|exists:autorisations_pointage,id',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
-            'position_lat' => 'nullable|numeric', // Support de l'ancien nom
+            'position_lat' => 'nullable|numeric',
             'position_lng' => 'nullable|numeric',
         ]);
 
-        $carnet = CarnetDeStage::where('id', $data['carnet_id'])
-            ->where('stagiaire_id', $request->user()->stagiaire->id)
-            ->firstOrFail();
+        if (empty($data['carnet_id']) && empty($data['autorisation_pointage_id'])) {
+            return response()->json(['message' => 'carnet_id ou autorisation_pointage_id requis.'], 422);
+        }
+
+        $stagiaireId = $request->user()->stagiaire->id;
+        $carnet = null;
+        $autorisation = null;
+
+        if (!empty($data['autorisation_pointage_id'])) {
+            $autorisation = \App\Models\AutorisationPointage::where('id', $data['autorisation_pointage_id'])
+                ->where('stagiaire_id', $stagiaireId)
+                ->firstOrFail();
+            if ($autorisation->carnet_id) {
+                $carnet = CarnetDeStage::find($autorisation->carnet_id);
+            }
+        } else {
+            $carnet = CarnetDeStage::where('id', $data['carnet_id'])
+                ->where('stagiaire_id', $stagiaireId)
+                ->firstOrFail();
+            $autorisation = \App\Models\AutorisationPointage::where('carnet_id', $carnet->id)->first();
+            if (!$autorisation) {
+                return response()->json(['message' => 'Aucune autorisation de pointage associée.'], 404);
+            }
+        }
 
         // Vérification signature convention
-        if (!$carnet->convention || $carnet->convention->statut !== 'signee') {
+        if ($autorisation->statut !== 'CONVENTION_SIGNEE') {
             return response()->json(['message' => 'Pointage impossible. La convention doit être signée par les deux parties.'], 403);
         }
 
+        // Vérification de la plage de dates du stage
+        $today = now()->startOfDay();
+        $debut = $autorisation->date_debut ? $autorisation->date_debut->startOfDay() : null;
+        $fin = $autorisation->date_fin ? $autorisation->date_fin->startOfDay() : null;
+
+        if ($debut && $fin && ($today->lt($debut) || $today->gt($fin))) {
+            return response()->json([
+                'message' => 'Pointage refusé. La période de stage (' . $debut->format('d/m/Y') . ' au ' . $fin->format('d/m/Y') . ') n\'est pas en cours.',
+            ], 403);
+        }
+
+        // Vérification du jour de la semaine
+        $joursSemaine = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+        $aujourdhui = $joursSemaine[now()->dayOfWeek];
+        $joursAutorises = $autorisation->jours_presence ?? [];
+
+        if (!empty($joursAutorises) && !in_array($aujourdhui, $joursAutorises)) {
+            return response()->json([
+                'message' => "Pointage refusé. Le stagiaire ne travaille pas le $aujourdhui d'après la convention.",
+            ], 403);
+        }
+
         // Empêche une double arrivée sans départ entre les deux
-        $dejaOuverte = EntreeCarnet::where('carnet_id', $carnet->id)
+        $dejaOuverte = EntreeCarnet::where('autorisation_pointage_id', $autorisation->id)
             ->where('type', 'PRESENCE')
             ->whereNull('date_fin')
             ->exists();
 
         if ($dejaOuverte) {
             throw ValidationException::withMessages([
-                'carnet_id' => 'Une présence est déjà en cours pour ce carnet.',
+                'carnet_id' => 'Une présence est déjà en cours.',
             ]);
         }
 
         // Requalification automatique : si la dernière entrée terminée était en attente (ou sortie récente),
         // ce retour confirme qu'il s'agissait d'une pause.
-        $derniereSortieEnAttente = EntreeCarnet::where('carnet_id', $carnet->id)
+        $derniereSortieEnAttente = EntreeCarnet::where('autorisation_pointage_id', $autorisation->id)
             ->where('type', 'PRESENCE')
             ->whereNotNull('date_fin')
             ->where('statut_cloture', 'EN_ATTENTE')
@@ -56,7 +100,8 @@ class PointageController extends Controller
         }
 
         $entree = EntreeCarnet::create([
-            'carnet_id' => $carnet->id,
+            'carnet_id' => $carnet?->id,
+            'autorisation_pointage_id' => $autorisation->id,
             'type' => 'PRESENCE',
             'date_debut' => now(),
             'position_lat' => $data['latitude'] ?? $data['position_lat'] ?? 0,
@@ -73,19 +118,41 @@ class PointageController extends Controller
     public function depart(Request $request)
     {
         $data = $request->validate([
-            'carnet_id' => 'required|string|exists:carnets_de_stage,id',
+            'carnet_id' => 'nullable|string|exists:carnets_de_stage,id',
+            'autorisation_pointage_id' => 'nullable|string|exists:autorisations_pointage,id',
         ]);
 
-        $carnet = CarnetDeStage::where('id', $data['carnet_id'])
-            ->where('stagiaire_id', $request->user()->stagiaire->id)
-            ->firstOrFail();
+        if (empty($data['carnet_id']) && empty($data['autorisation_pointage_id'])) {
+            return response()->json(['message' => 'carnet_id ou autorisation_pointage_id requis.'], 422);
+        }
+
+        $stagiaireId = $request->user()->stagiaire->id;
+        $carnet = null;
+        $autorisation = null;
+
+        if (!empty($data['autorisation_pointage_id'])) {
+            $autorisation = \App\Models\AutorisationPointage::where('id', $data['autorisation_pointage_id'])
+                ->where('stagiaire_id', $stagiaireId)
+                ->firstOrFail();
+            if ($autorisation->carnet_id) {
+                $carnet = CarnetDeStage::find($autorisation->carnet_id);
+            }
+        } else {
+            $carnet = CarnetDeStage::where('id', $data['carnet_id'])
+                ->where('stagiaire_id', $stagiaireId)
+                ->firstOrFail();
+            $autorisation = \App\Models\AutorisationPointage::where('carnet_id', $carnet->id)->first();
+            if (!$autorisation) {
+                return response()->json(['message' => 'Aucune autorisation de pointage associée.'], 404);
+            }
+        }
 
         // Vérification signature convention
-        if (!$carnet->convention || $carnet->convention->statut !== 'signee') {
+        if ($autorisation->statut !== 'CONVENTION_SIGNEE') {
             return response()->json(['message' => 'Clôture de présence impossible. La convention doit être signée par les deux parties.'], 403);
         }
 
-        $entree = EntreeCarnet::where('carnet_id', $carnet->id)
+        $entree = EntreeCarnet::where('autorisation_pointage_id', $autorisation->id)
             ->where('type', 'PRESENCE')
             ->whereNull('date_fin')
             ->latest('date_debut')
@@ -93,7 +160,7 @@ class PointageController extends Controller
 
         if (!$entree) {
             throw ValidationException::withMessages([
-                'carnet_id' => 'Aucune présence en cours à clôturer pour ce carnet.',
+                'id' => 'Aucune présence en cours à clôturer.',
             ]);
         }
 
@@ -109,14 +176,32 @@ class PointageController extends Controller
     public function confirmerPause(Request $request)
     {
         $data = $request->validate([
-            'carnet_id' => 'required|string|exists:carnets_de_stage,id',
+            'carnet_id' => 'nullable|string|exists:carnets_de_stage,id',
+            'autorisation_pointage_id' => 'nullable|string|exists:autorisations_pointage,id',
         ]);
 
-        $carnet = CarnetDeStage::where('id', $data['carnet_id'])
-            ->where('stagiaire_id', $request->user()->stagiaire->id)
-            ->firstOrFail();
+        if (empty($data['carnet_id']) && empty($data['autorisation_pointage_id'])) {
+            return response()->json(['message' => 'carnet_id ou autorisation_pointage_id requis.'], 422);
+        }
 
-        $entree = EntreeCarnet::where('carnet_id', $carnet->id)
+        $stagiaireId = $request->user()->stagiaire->id;
+        $autorisation = null;
+
+        if (!empty($data['autorisation_pointage_id'])) {
+            $autorisation = \App\Models\AutorisationPointage::where('id', $data['autorisation_pointage_id'])
+                ->where('stagiaire_id', $stagiaireId)
+                ->firstOrFail();
+        } else {
+            $carnet = CarnetDeStage::where('id', $data['carnet_id'])
+                ->where('stagiaire_id', $stagiaireId)
+                ->firstOrFail();
+            $autorisation = \App\Models\AutorisationPointage::where('carnet_id', $carnet->id)->first();
+            if (!$autorisation) {
+                return response()->json(['message' => 'Aucune autorisation de pointage associée.'], 404);
+            }
+        }
+
+        $entree = EntreeCarnet::where('autorisation_pointage_id', $autorisation->id)
             ->where('type', 'PRESENCE')
             ->whereNotNull('date_fin')
             ->where('statut_cloture', 'EN_ATTENTE')
@@ -135,14 +220,32 @@ class PointageController extends Controller
     public function confirmerDepart(Request $request)
     {
         $data = $request->validate([
-            'carnet_id' => 'required|string|exists:carnets_de_stage,id',
+            'carnet_id' => 'nullable|string|exists:carnets_de_stage,id',
+            'autorisation_pointage_id' => 'nullable|string|exists:autorisations_pointage,id',
         ]);
 
-        $carnet = CarnetDeStage::where('id', $data['carnet_id'])
-            ->where('stagiaire_id', $request->user()->stagiaire->id)
-            ->firstOrFail();
+        if (empty($data['carnet_id']) && empty($data['autorisation_pointage_id'])) {
+            return response()->json(['message' => 'carnet_id ou autorisation_pointage_id requis.'], 422);
+        }
 
-        $entree = EntreeCarnet::where('carnet_id', $carnet->id)
+        $stagiaireId = $request->user()->stagiaire->id;
+        $autorisation = null;
+
+        if (!empty($data['autorisation_pointage_id'])) {
+            $autorisation = \App\Models\AutorisationPointage::where('id', $data['autorisation_pointage_id'])
+                ->where('stagiaire_id', $stagiaireId)
+                ->firstOrFail();
+        } else {
+            $carnet = CarnetDeStage::where('id', $data['carnet_id'])
+                ->where('stagiaire_id', $stagiaireId)
+                ->firstOrFail();
+            $autorisation = \App\Models\AutorisationPointage::where('carnet_id', $carnet->id)->first();
+            if (!$autorisation) {
+                return response()->json(['message' => 'Aucune autorisation de pointage associée.'], 404);
+            }
+        }
+
+        $entree = EntreeCarnet::where('autorisation_pointage_id', $autorisation->id)
             ->where('type', 'PRESENCE')
             ->whereNotNull('date_fin')
             ->where('statut_cloture', 'EN_ATTENTE')
@@ -158,22 +261,30 @@ class PointageController extends Controller
     }
 
     // Liste les entrées de présence d'un carnet (pour vérifier visuellement)
-    public function historique(Request $request, string $carnetId)
+    public function historique(Request $request, ?string $carnetId = null, ?string $autorisationId = null)
     {
         $user = $request->user();
-        $carnet = CarnetDeStage::findOrFail($carnetId);
+        $autorisation = null;
+
+        // On récupère les IDs soit par arguments (positionnel), soit par nom de paramètre de route
+        $idAutre = $autorisationId ?: $request->route('autorisationId');
+        $idCarnet = $carnetId ?: $request->route('carnetId');
+
+        if ($idAutre) {
+            $autorisation = \App\Models\AutorisationPointage::findOrFail($idAutre);
+        } elseif ($idCarnet) {
+            $carnet = CarnetDeStage::findOrFail($idCarnet);
+            $autorisation = \App\Models\AutorisationPointage::where('carnet_id', $carnet->id)->firstOrFail();
+        } else {
+            return response()->json(['message' => 'Identifiant manquant.'], 422);
+        }
 
         // Autorisation : Stagiaire propriétaire ou Tuteur autorisé
-        $isProprietaire = $user->role === 'stagiaire' && $carnet->stagiaire_id === $user->stagiaire->id;
+        $isProprietaire = $user->role === 'stagiaire' && $autorisation->stagiaire_id === $user->stagiaire->id;
 
         $isTuteurAutorise = false;
         if ($user->role === 'entreprise') {
-            $autorisation = \App\Models\AutorisationPointage::where('stagiaire_id', $carnet->stagiaire_id)
-                ->where('entreprise_id', $user->entreprise->id)
-                ->whereIn('statut', ['ACTIVE', 'CONVENTION_SIGNEE'])
-                ->where('carnet_id', $carnet->id)
-                ->exists();
-            $isTuteurAutorise = (bool) $autorisation;
+            $isTuteurAutorise = ($autorisation->entreprise_id === $user->entreprise->id);
         }
 
         if (!$isProprietaire && !$isTuteurAutorise) {
@@ -181,9 +292,7 @@ class PointageController extends Controller
         }
 
         // Règle de signature de convention : Accès au pointage bloqué tant que non signée
-        if (!$carnet->convention || $carnet->convention->statut !== 'signee') {
-            // Si c'est le tuteur qui consulte, on renvoie un statut explicite au lieu d'une erreur 403 brute
-            // pour permettre au dashboard de gérer l'affichage "En attente de signature".
+        if ($autorisation->statut !== 'CONVENTION_SIGNEE') {
             if ($user->role === 'entreprise') {
                 return response()->json([
                     'statut' => 'convention_non_signee',
@@ -195,7 +304,7 @@ class PointageController extends Controller
             return response()->json(['message' => 'L\'accès au suivi de présence est bloqué. La convention doit être signée par les deux parties.'], 403);
         }
 
-        return EntreeCarnet::where('carnet_id', $carnet->id)
+        return EntreeCarnet::where('autorisation_pointage_id', $autorisation->id)
             ->where('type', 'PRESENCE')
             ->orderByDesc('date_debut')
             ->get();

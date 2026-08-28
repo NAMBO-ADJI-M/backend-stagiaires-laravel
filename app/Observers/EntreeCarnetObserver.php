@@ -29,8 +29,13 @@ class EntreeCarnetObserver
 
         $dureeHeures = Carbon::parse($entree->date_debut)->floatDiffInHours(Carbon::parse($entree->date_fin));
 
-        $this->repartirHeuresSurCompetences($entree->carnet_id, $dureeHeures);
-        $this->mettreAJourAssiduite($entree->carnet_id, $dureeHeures);
+        // 1. Toujours mettre à jour l'assiduité sur l'autorisation
+        $this->mettreAJourAssiduite($entree, $dureeHeures);
+
+        // 2. Si un carnet est lié, répartir les heures sur les compétences
+        if ($entree->carnet_id) {
+            $this->repartirHeuresSurCompetences($entree->carnet_id, $dureeHeures);
+        }
     }
 
     // Répartit les heures au prorata sur toutes les compétences actives (non MAITRISEE) du carnet
@@ -66,15 +71,23 @@ class EntreeCarnetObserver
         }
     }
 
-    // Met à jour (ou crée) l'indicateur d'assiduité du carnet
-    private function mettreAJourAssiduite(string $carnetId, float $dureeHeures): void
+    // Met à jour (ou crée) l'indicateur d'assiduité lié à l'autorisation
+    private function mettreAJourAssiduite(EntreeCarnet $entree, float $dureeHeures): void
     {
+        $autorisationId = $entree->autorisation_pointage_id;
+
         $indicateur = IndicateurAssiduite::firstOrCreate(
-            ['carnet_id' => $carnetId],
-            ['jours_presents' => 0, 'jours_attendus' => 0, 'heures_totales_realisees' => 0]
+            ['autorisation_pointage_id' => $autorisationId],
+            [
+                'carnet_id' => $entree->carnet_id,
+                'jours_presents' => 0,
+                'jours_attendus' => 0,
+                'heures_totales_realisees' => 0
+            ]
         );
 
-        $joursDistincts = EntreeCarnet::where('carnet_id', $carnetId)
+        // On recompte les jours distincts pour cette autorisation
+        $joursDistincts = EntreeCarnet::where('autorisation_pointage_id', $autorisationId)
             ->where('type', 'PRESENCE')
             ->whereNotNull('date_fin')
             ->selectRaw('DATE(date_debut) as jour')

@@ -180,7 +180,7 @@ class CarnetController extends Controller
             abort(403, "L'accès au carnet est bloqué car la convention est signée.");
         }
 
-        $indicateur = IndicateurAssiduite::where('carnet_id', $carnet->id)->first();
+        $indicateur = $carnet->indicateurAssiduite;
         $joursPresents = $indicateur->jours_presents ?? 0;
         $joursAttendus = $indicateur->jours_attendus ?? 0;
 
@@ -314,7 +314,7 @@ class CarnetController extends Controller
                     ->where('entreprise_id', $entrepriseId)
                     ->first();
 
-                $indicateur = IndicateurAssiduite::where('carnet_id', $carnet->id)->first();
+                $indicateur = $carnet->indicateurAssiduite;
                 $joursPresents = $indicateur->jours_presents ?? 0;
                 $joursAttendus = $indicateur->jours_attendus ?? 0;
                 $progression = $joursAttendus > 0 ? ($joursPresents / $joursAttendus) : 0;
@@ -370,7 +370,9 @@ class CarnetController extends Controller
             ->count();
 
         // Calcul de l'assiduité moyenne pour l'ensemble des stagiaires rattachés
-        $progressions = IndicateurAssiduite::whereIn('carnet_id', $carnetsIds)->get();
+        $progressions = IndicateurAssiduite::whereHas('autorisation', function($q) use ($entrepriseId) {
+            $q->where('entreprise_id', $entrepriseId);
+        })->get();
         $moyenne = 0;
         if ($progressions->isNotEmpty()) {
             $somme = $progressions->sum(function ($p) {

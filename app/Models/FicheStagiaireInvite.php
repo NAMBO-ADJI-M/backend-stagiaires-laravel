@@ -16,14 +16,20 @@ class FicheStagiaireInvite extends Model
         'entreprise_id', 'nom', 'prenom', 'email',
         'code_invitation', 'utilise', 'carnet_id', 'date_expiration',
         'poste', 'date_debut', 'date_fin', 'etablissement_nom', 'tuteur_designe',
-        'objet_stage', 'cursus_rattachement', 'lieu_execution',
-        'lieu_execution_lat', 'lieu_execution_lng', 'duree_hebdomadaire',
+        'objet_stage', 'objet_stage_autre', 'cursus_rattachement', 'lieu_execution',
+        'lieu_execution_lat', 'lieu_execution_lng', 'nombre_mois_stage', 'duree_hebdomadaire',
         'jours_presence', 'teletravail_modalites', 'referent_pedagogique_nom',
-        'referent_pedagogique_contact', 'modalites_suivi_detail', 'conditions_stage',
+        'referent_pedagogique_contact', 'conditions_stage',
+        'raison_sociale_custom', 'adresse_custom', 'secteur_activite_custom',
+        'entreprise_email_document', 'entreprise_telephone_document',
+        'representant_legal_nom', 'representant_legal_fonction', 'representant_legal_contact',
+        'gratification_prevue', 'gratification_montant', 'gratification_periodicite', 'conges_absences',
+        'stagiaire_annee_academique',
     ];
 
     protected $casts = [
         'utilise' => 'boolean',
+        'jours_presence' => 'array',
         'date_expiration' => 'datetime',
     ];
 

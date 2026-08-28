@@ -77,7 +77,14 @@ class CarnetDeStage extends Model
 
     public function indicateurAssiduite()
     {
-        return $this->hasOne(IndicateurAssiduite::class, 'carnet_id');
+        return $this->hasOneThrough(
+            IndicateurAssiduite::class,
+            AutorisationPointage::class,
+            'carnet_id',
+            'autorisation_pointage_id',
+            'id',
+            'id'
+        );
     }
 
     public function convention()

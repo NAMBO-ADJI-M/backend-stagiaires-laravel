@@ -13,7 +13,7 @@ class EntreeCarnet extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'carnet_id', 'type', 'titre', 'date_debut', 'date_fin',
+        'carnet_id', 'autorisation_pointage_id', 'type', 'titre', 'date_debut', 'date_fin',
         'position_lat', 'position_lng', 'source_validation',
         'commentaire_stagiaire', 'commentaire_tuteur',
         'session_id', 'statut_cloture',

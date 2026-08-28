@@ -28,21 +28,38 @@ class CarnetDeStageObserver
             ]);
         }
 
-        // 2. Calculer le nombre de jours ouvrés attendus (Lundi au Vendredi)
+        // 2. Calculer le nombre de jours ouvrés attendus
         $dateDebut = Carbon::parse($carnet->date_debut);
         $dateFin = Carbon::parse($carnet->date_fin);
 
         $joursAttendus = $dateDebut->diffInDaysFiltered(function (Carbon $date) {
             return !$date->isWeekend();
-        }, $dateFin->addDay()); // addDay car diffInDays est exclusif de la date de fin
+        }, $dateFin->addDay());
 
-        // 3. Initialiser l'indicateur d'assiduité
-        IndicateurAssiduite::create([
-            'carnet_id' => $carnet->id,
-            'jours_presents' => 0,
-            'jours_attendus' => $joursAttendus,
-            'heures_totales_realisees' => 0
-        ]);
+        // 3. Tenter de lier l'indicateur d'assiduité existant de l'autorisation
+        $autorisation = \App\Models\AutorisationPointage::where('stagiaire_id', $carnet->stagiaire_id)
+            ->where('entreprise_id', $carnet->entreprise_id)
+            ->first();
+
+        if ($autorisation) {
+            $indicateur = IndicateurAssiduite::firstOrCreate(
+                ['autorisation_pointage_id' => $autorisation->id],
+                [
+                    'carnet_id' => $carnet->id,
+                    'jours_presents' => 0,
+                    'jours_attendus' => $joursAttendus,
+                    'heures_totales_realisees' => 0
+                ]
+            );
+
+            // Mise à jour systématique du carnet_id et des jours attendus contractuels
+            $indicateur->update([
+                'carnet_id' => $carnet->id,
+                'jours_attendus' => $joursAttendus
+            ]);
+        }
+        // NOTE : Si pas d'autorisation (cas rare d'un carnet créé avant toute liaison),
+        // on ne crée pas d'IndicateurAssiduite ici. Il sera créé au premier pointage.
     }
 
     // Au rattachement à une entreprise ou changement de dates

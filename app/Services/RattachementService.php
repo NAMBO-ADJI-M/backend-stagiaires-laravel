@@ -32,8 +32,12 @@ class RattachementService
 
         // 2. Le carnet reste la propriété du stagiaire, on active juste le suivi
         $carnet->update([
+            'entreprise_id' => $entreprise->id,
             'autorisation_suivi' => true,
             'date_rattachement' => now(),
+            'statut' => 'EN_COURS',
+            'date_debut' => $autorisation->date_debut,
+            'date_fin' => $autorisation->date_fin,
         ]);
 
         // 3. Création/Mise à jour de la Convention officielle
@@ -42,18 +46,26 @@ class RattachementService
             [
                 'raison_sociale' => $autorisation->raison_sociale_custom ?? $entreprise->raison_sociale,
                 'adresse' => $autorisation->adresse_custom ?? $entreprise->adresse_libelle,
-                'situation_geographique' => $autorisation->situation_geographique,
                 'secteur_activite' => $autorisation->secteur_activite_custom ?? $entreprise->secteur,
 
                 'representant_legal_nom' => $autorisation->representant_legal_nom,
                 'representant_legal_fonction' => $autorisation->representant_legal_fonction,
                 'representant_legal_contact' => $autorisation->representant_legal_contact,
 
+                'objet_stage' => $autorisation->objet_stage,
+                'objet_stage_autre' => $autorisation->objet_stage_autre,
+                'cursus_rattachement' => $autorisation->cursus_rattachement,
+
                 'date_debut' => $autorisation->date_debut,
                 'date_fin' => $autorisation->date_fin,
                 'duree_hebdomadaire' => $autorisation->duree_hebdomadaire,
                 'jours_presence' => $autorisation->jours_presence,
+                'teletravail_modalites' => $autorisation->teletravail_modalites,
+                'nombre_mois_stage' => $autorisation->nombre_mois_stage,
+
                 'lieu_execution' => $autorisation->lieu_execution,
+                'lieu_execution_lat' => $autorisation->lieu_execution_lat,
+                'lieu_execution_lng' => $autorisation->lieu_execution_lng,
                 'modalites_suivi' => $autorisation->modalites_suivi_detail,
 
                 'gratification_prevue' => $autorisation->gratification_prevue,
@@ -76,9 +88,8 @@ class RattachementService
                 'stagiaire_email' => $stagiaire->email,
                 'stagiaire_telephone' => $stagiaire->telephone,
                 'stagiaire_adresse' => $stagiaire->domicile_adresse,
-                'stagiaire_date_naissance' => $stagiaire->date_naissance,
                 'stagiaire_etablissement' => $autorisation->etablissement_nom,
-                'stagiaire_annee_academique' => $autorisation->stagiaire_annee_academique ?? $autorisation->cursus_rattachement,
+                'stagiaire_annee_academique' => $autorisation->stagiaire_annee_academique,
 
                 'statut' => 'signee',
                 'tuteur_valide_le' => $autorisation->tuteur_valide_le ?? $autorisation->created_at ?? now(),

@@ -37,7 +37,6 @@ class FicheStagiaireInviteController extends Controller
             // Infos Entreprise Document
             'raison_sociale_custom' => 'nullable|string|max:255',
             'adresse_custom' => 'nullable|string|max:255',
-            'situation_geographique' => 'nullable|string|max:255',
             'secteur_activite_custom' => 'nullable|string|max:255',
             'entreprise_email_document' => 'nullable|email|max:255',
             'entreprise_telephone_document' => 'nullable|string|max:20',
@@ -48,19 +47,21 @@ class FicheStagiaireInviteController extends Controller
             'representant_legal_contact' => 'nullable|string|max:255',
 
             'objet_stage' => 'nullable|string|max:500',
+            'objet_stage_autre' => 'nullable|string|max:500',
             'cursus_rattachement' => 'nullable|string|max:255',
             'stagiaire_annee_academique' => 'nullable|string|max:50',
 
             'lieu_execution' => 'nullable|string|max:255',
             'lieu_execution_lat' => 'nullable|numeric|between:-90,90',
             'lieu_execution_lng' => 'nullable|numeric|between:-180,180',
+            'nombre_mois_stage' => 'nullable|integer',
             'duree_hebdomadaire' => 'nullable|string|max:100',
-            'jours_presence' => 'nullable|string|max:255',
+            'jours_presence' => 'nullable|array',
+            'jours_presence.*' => 'string|in:lundi,mardi,mercredi,jeudi,vendredi,samedi,dimanche',
             'teletravail_modalites' => 'nullable|string|max:255',
 
             'referent_pedagogique_nom' => 'nullable|string|max:255',
             'referent_pedagogique_contact' => 'nullable|string|max:255',
-            'modalites_suivi_detail' => 'nullable|string',
 
             // Gratification & Congés
             'gratification_prevue' => 'nullable|boolean',
