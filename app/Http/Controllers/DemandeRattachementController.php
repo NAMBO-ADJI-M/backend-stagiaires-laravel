@@ -31,10 +31,23 @@ class DemandeRattachementController extends Controller
      */
     public function checkStatus(Request $request)
     {
-        $stagiaire = $request->user()->stagiaire;
+        $user = $request->user();
 
-        if (!$stagiaire) {
-            return response()->json(['message' => 'Profil stagiaire non trouvé.'], 404);
+        // On cherche le profil y compris s'il est supprimé
+        $stagiaire = \App\Models\Stagiaire::withTrashed()->where('user_id', $user->id)->first();
+
+        if ($stagiaire && $stagiaire->trashed()) {
+            $stagiaire->restore();
+        } elseif (!$stagiaire) {
+            // Création de secours si vraiment absent
+            $stagiaire = \App\Models\Stagiaire::create([
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'nom' => null,
+                'prenom' => null,
+                'profil_complet' => false,
+                'carnet_creer' => false,
+            ]);
         }
 
         $count = DemandeRattachement::where('stagiaire_id', $stagiaire->id)->count();

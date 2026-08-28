@@ -27,6 +27,7 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
+            'role' => 'nullable|string|in:stagiaire,entreprise',
         ]);
 
         if ($validator->fails()) {
@@ -55,11 +56,28 @@ class AuthController extends Controller
                     $profil = Stagiaire::withTrashed()->where('user_id', $user->id)->first();
                     if ($profil && $profil->trashed()) {
                         $profil->restore();
+                    } elseif (!$profil) {
+                        // Cas rare : User existe (même trashed) mais pas de profil
+                        Stagiaire::create([
+                            'user_id' => $user->id,
+                            'email' => $user->email,
+                            'nom' => null,
+                            'prenom' => null,
+                            'profil_complet' => false,
+                            'carnet_creer' => false,
+                        ]);
                     }
                 } elseif ($user->role === 'entreprise') {
                     $profil = Entreprise::withTrashed()->where('user_id', $user->id)->first();
                     if ($profil && $profil->trashed()) {
                         $profil->restore();
+                    } elseif (!$profil) {
+                        Entreprise::create([
+                            'user_id' => $user->id,
+                            'email' => $user->email,
+                            'raison_sociale' => 'Mon Entreprise',
+                            'profil_complet' => false,
+                        ]);
                     }
                 }
 
@@ -70,11 +88,31 @@ class AuthController extends Controller
             $user = User::create([
                 'email' => $email,
                 'password' => Hash::make(Str::random(40)),
-                'role' => 'stagiaire', // Rôle par défaut
+                'role' => $request->role ?? 'stagiaire', // Utilisation du rôle demandé ou stagiaire par défaut
                 'is_active' => true,
             ]);
+
+            // Création immédiate du profil métier pour éviter les erreurs 404 ultérieures
+            if ($user->role === 'stagiaire') {
+                Stagiaire::create([
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'nom' => null,
+                    'prenom' => null,
+                    'profil_complet' => false,
+                    'carnet_creer' => false,
+                ]);
+            } else {
+                Entreprise::create([
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'raison_sociale' => 'Mon Entreprise',
+                    'profil_complet' => false,
+                ]);
+            }
+
             $isNewUser = true;
-            Log::info("✨ Nouvel utilisateur créé : {$email}");
+            Log::info("✨ Nouvel utilisateur créé : {$email} avec rôle {$user->role}");
         }
 
         // 🛑 S'assurer que le compte est actif (indépendant du soft delete)
@@ -587,7 +625,22 @@ class AuthController extends Controller
     private function getProfileStatus(User $user): array
     {
         if ($user->role === 'stagiaire') {
-            $stagiaire = Stagiaire::where('user_id', $user->id)->first();
+            $stagiaire = Stagiaire::withTrashed()->where('user_id', $user->id)->first();
+
+            // Auto-restauration ou création défensive si manquant
+            if ($stagiaire && $stagiaire->trashed()) {
+                $stagiaire->restore();
+            } elseif (!$stagiaire) {
+                $stagiaire = Stagiaire::create([
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'nom' => null,
+                    'prenom' => null,
+                    'profil_complet' => false,
+                    'carnet_creer' => false,
+                ]);
+            }
+
             $profilComplet = $stagiaire->profil_complet ?? false;
             $carnetCree = $stagiaire->carnet_creer ?? false;
 
@@ -600,7 +653,20 @@ class AuthController extends Controller
                     : 'Complétez votre profil'
             ];
         } else {
-            $entreprise = Entreprise::where('user_id', $user->id)->first();
+            $entreprise = Entreprise::withTrashed()->where('user_id', $user->id)->first();
+
+            // Auto-restauration ou création défensive si manquant
+            if ($entreprise && $entreprise->trashed()) {
+                $entreprise->restore();
+            } elseif (!$entreprise) {
+                $entreprise = Entreprise::create([
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'raison_sociale' => 'Mon Entreprise',
+                    'profil_complet' => false,
+                ]);
+            }
+
             $profilComplet = $entreprise->profil_complet ?? false;
 
             return [
