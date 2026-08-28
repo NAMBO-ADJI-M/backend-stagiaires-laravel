@@ -240,15 +240,22 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        // Nettoyage des profils associés si nécessaire (ou laisser SoftDeletes gérer)
+        // Nettoyage des profils associés
         if ($user->role === 'stagiaire') {
-            $user->stagiaire()->delete();
+            $stagiaire = $user->stagiaire;
+            if ($stagiaire) {
+                // 🗑️ Suppression DÉFINITIVE des demandes de rattachement
+                // pour que le stagiaire reparte à zéro s'il recrée son compte.
+                \App\Models\DemandeRattachement::where('stagiaire_id', $stagiaire->id)->delete();
+
+                $stagiaire->delete(); // Soft delete du profil
+            }
         } else {
-            $user->entreprise()->delete();
+            $user->entreprise()->delete(); // Soft delete du profil entreprise
         }
 
         $user->tokens()->delete();
-        $user->delete(); // Soft delete grâce au trait SoftDeletes dans le modèle User
+        $user->delete(); // Soft delete du User
 
         return response()->json([
             'message' => '✅ Compte supprimé avec succès.'
