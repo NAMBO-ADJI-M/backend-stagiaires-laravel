@@ -71,4 +71,9 @@ class AutorisationPointage extends Model
     {
         return $this->belongsTo(Entreprise::class);
     }
+
+    public function convention()
+    {
+        return $this->hasOne(Convention::class, 'autorisation_pointage_id');
+    }
 }

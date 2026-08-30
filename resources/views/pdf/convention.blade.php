@@ -58,7 +58,7 @@
 <div class="section">
     <div class="section-title">3. Conditions Matérielles</div>
     <div class="row"><span class="label">Durée hebdomadaire :</span> {{ $autorisation->duree_hebdomadaire }}</div>
-    <div class="row"><span class="label">Jours de présence :</span> {{ $autorisation->jours_presence }}</div>
+    <div class="row"><span class="label">Jours de présence :</span> {{ is_array($autorisation->jours_presence) ? implode(', ', $autorisation->jours_presence) : $autorisation->jours_presence }}</div>
     <div class="row"><span class="label">Modalités de télétravail :</span> {{ $autorisation->teletravail_modalites }}</div>
 
     <div class="row" style="margin-top: 10px;"><span class="label">Gratification :</span>

@@ -15,7 +15,8 @@ class ConventionController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'carnet_id' => 'required|uuid|exists:carnets_de_stage,id',
+            'carnet_id' => 'nullable|uuid|exists:carnets_de_stage,id',
+            'autorisation_pointage_id' => 'nullable|uuid|exists:autorisations_pointage,id',
             // Champs Entreprise / Tuteur
             'raison_sociale' => 'nullable|string|max:255',
             'adresse' => 'nullable|string|max:255',
@@ -49,33 +50,61 @@ class ConventionController extends Controller
             'stagiaire_annee_academique' => 'nullable|string|max:50',
         ]);
 
-        $carnet = CarnetDeStage::findOrFail($validated['carnet_id']);
-        $this->autoriserAccesCarnet($request, $carnet);
+        $carnet = null;
+        $autorisation = null;
+
+        if (!empty($validated['carnet_id'])) {
+            $carnet = CarnetDeStage::findOrFail($validated['carnet_id']);
+            $this->autoriserAccesCarnet($request, $carnet);
+        }
+
+        if (!empty($validated['autorisation_pointage_id'])) {
+            $autorisation = \App\Models\AutorisationPointage::findOrFail($validated['autorisation_pointage_id']);
+            $this->autoriserAccesAutorisation($request, $autorisation);
+        }
+
+        if (!$carnet && !$autorisation) {
+            return response()->json(['message' => 'Un identifiant de carnet ou d\'autorisation est requis.'], 422);
+        }
+
+        $searchCriteria = [];
+        if ($carnet) {
+            $searchCriteria['carnet_id'] = $carnet->id;
+            $validated['stagiaire_id'] = $carnet->stagiaire_id;
+            $validated['entreprise_id'] = $carnet->entreprise_id;
+        }
+        if ($autorisation) {
+            $searchCriteria['autorisation_pointage_id'] = $autorisation->id;
+            $validated['stagiaire_id'] = $autorisation->stagiaire_id;
+            $validated['entreprise_id'] = $autorisation->entreprise_id;
+        }
 
         $convention = Convention::updateOrCreate(
-            ['carnet_id' => $carnet->id],
+            $searchCriteria,
             $validated
         );
 
         // Synchronisation avec le profil Stagiaire
-        if ($carnet->stagiaire) {
-            $carnet->stagiaire->update([
-                'nom' => $validated['stagiaire_nom'] ?? $carnet->stagiaire->nom,
-                'prenom' => $validated['stagiaire_prenom'] ?? $carnet->stagiaire->prenom,
-                'telephone' => $validated['stagiaire_telephone'] ?? $carnet->stagiaire->telephone,
-                'domicile_adresse' => $validated['stagiaire_adresse'] ?? $carnet->stagiaire->domicile_adresse,
-                'date_naissance' => $validated['stagiaire_date_naissance'] ?? $carnet->stagiaire->date_naissance,
-                'ecole' => $validated['stagiaire_etablissement'] ?? $carnet->stagiaire->ecole,
+        $stagiaire = ($carnet && $carnet->stagiaire) ? $carnet->stagiaire : ($autorisation ? $autorisation->stagiaire : null);
+        if ($stagiaire) {
+            $stagiaire->update([
+                'nom' => $validated['stagiaire_nom'] ?? $stagiaire->nom,
+                'prenom' => $validated['stagiaire_prenom'] ?? $stagiaire->prenom,
+                'telephone' => $validated['stagiaire_telephone'] ?? $stagiaire->telephone,
+                'domicile_adresse' => $validated['stagiaire_adresse'] ?? $stagiaire->domicile_adresse,
+                'date_naissance' => $validated['stagiaire_date_naissance'] ?? $stagiaire->date_naissance,
+                'ecole' => $validated['stagiaire_etablissement'] ?? $stagiaire->ecole,
             ]);
         }
 
         // Synchronisation avec le profil Entreprise
-        if ($carnet->entreprise) {
-            $carnet->entreprise->update([
-                'raison_sociale' => $validated['raison_sociale'] ?? $carnet->entreprise->raison_sociale,
-                'secteur' => $validated['secteur_activite'] ?? $carnet->entreprise->secteur,
-                'adresse_libelle' => $validated['adresse'] ?? $carnet->entreprise->adresse_libelle,
-                'telephone' => $validated['entreprise_telephone'] ?? $carnet->entreprise->telephone,
+        $entreprise = ($carnet && $carnet->entreprise) ? $carnet->entreprise : ($autorisation ? $autorisation->entreprise : null);
+        if ($entreprise) {
+            $entreprise->update([
+                'raison_sociale' => $validated['raison_sociale'] ?? $entreprise->raison_sociale,
+                'secteur' => $validated['secteur_activite'] ?? $entreprise->secteur,
+                'adresse_libelle' => $validated['adresse'] ?? $entreprise->adresse_libelle,
+                'telephone' => $validated['entreprise_telephone'] ?? $entreprise->telephone,
             ]);
         }
 
@@ -245,5 +274,20 @@ class ConventionController extends Controller
         }
 
         abort(403, "Vous n'avez pas accès à ce carnet.");
+    }
+
+    private function autoriserAccesAutorisation(Request $request, \App\Models\AutorisationPointage $autorisation): void
+    {
+        $user = $request->user();
+
+        if ($user->role === 'stagiaire' && $autorisation->stagiaire_id === $user->stagiaire->id) {
+            return;
+        }
+
+        if ($user->role === 'entreprise' && $autorisation->entreprise_id === $user->entreprise->id) {
+            return;
+        }
+
+        abort(403, "Vous n'avez pas accès à cette autorisation.");
     }
 }

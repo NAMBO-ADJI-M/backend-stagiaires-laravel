@@ -18,34 +18,44 @@ class RattachementService
      * et génère la convention signée avec les dates de validation effectives, puis envoie les emails.
      * Note : Le rattachement concerne l'autorisation de présence du stagiaire (et non son carnet personnel).
      */
-    public function rattacherEtSigner(CarnetDeStage $carnet, Entreprise $entreprise, AutorisationPointage $autorisation)
+    /**
+     * Effectue le rattachement de la présence/du suivi du stagiaire à une entreprise
+     * et génère la convention signée avec les dates de validation effectives, puis envoie les emails.
+     */
+    public function rattacherEtSigner(AutorisationPointage $autorisation, Entreprise $entreprise, ?CarnetDeStage $carnet = null)
     {
-        $stagiaire = $carnet->stagiaire;
+        $stagiaire = $autorisation->stagiaire;
 
-        // 1. Mise à jour de l'autorisation de présence (le rattachement concerne la présence)
+        // 1. Mise à jour de l'autorisation de présence
         $autorisation->update([
-            'carnet_id' => $carnet->id,
+            'carnet_id' => $carnet ? $carnet->id : $autorisation->carnet_id,
             'statut' => 'CONVENTION_SIGNEE',
             'tuteur_valide_le' => $autorisation->tuteur_valide_le ?? $autorisation->created_at ?? now(),
             'stagiaire_valide_le' => $autorisation->stagiaire_valide_le ?? now(),
         ]);
 
-        // 2. Le carnet reste la propriété du stagiaire, on active juste le suivi
-        $carnet->update([
-            'entreprise_id' => $entreprise->id,
-            'autorisation_suivi' => true,
-            'date_rattachement' => now(),
-            'statut' => 'EN_COURS',
-            'date_debut' => $autorisation->date_debut,
-            'date_fin' => $autorisation->date_fin,
-        ]);
+        // 2. Si un carnet est fourni, on active le suivi dessus
+        if ($carnet) {
+            $carnet->update([
+                'entreprise_id' => $entreprise->id,
+                'autorisation_suivi' => true,
+                'date_rattachement' => now(),
+                'statut' => 'EN_COURS',
+                'date_debut' => $autorisation->date_debut,
+                'date_fin' => $autorisation->date_fin,
+            ]);
+        }
 
-        // 3. Création/Mise à jour de la Convention officielle
+        // 3. Création/Mise à jour de la Convention officielle (basée sur l'autorisation)
         $convention = Convention::updateOrCreate(
-            ['carnet_id' => $carnet->id],
+            ['autorisation_pointage_id' => $autorisation->id],
             [
+                'carnet_id' => $carnet ? $carnet->id : null,
+                'stagiaire_id' => $autorisation->stagiaire_id,
+                'entreprise_id' => $entreprise->id,
                 'raison_sociale' => $autorisation->raison_sociale_custom ?? $entreprise->raison_sociale,
                 'adresse' => $autorisation->adresse_custom ?? $entreprise->adresse_libelle,
+                'situation_geographique' => $autorisation->adresse_custom ?? $entreprise->adresse_libelle, // champ requis par migration
                 'secteur_activite' => $autorisation->secteur_activite_custom ?? $entreprise->secteur,
 
                 'representant_legal_nom' => $autorisation->representant_legal_nom,
@@ -66,7 +76,7 @@ class RattachementService
                 'lieu_execution' => $autorisation->lieu_execution,
                 'lieu_execution_lat' => $autorisation->lieu_execution_lat,
                 'lieu_execution_lng' => $autorisation->lieu_execution_lng,
-                'modalites_suivi' => $autorisation->modalites_suivi_detail,
+                'modalites_suivi' => $autorisation->modalites_suivi_detail ?? 'Suivi via application StageLink',
 
                 'gratification_prevue' => $autorisation->gratification_prevue,
                 'gratification_montant' => $autorisation->gratification_montant,
@@ -100,7 +110,7 @@ class RattachementService
         // 4. Envoi de la convention par mail
         $this->envoyerConventionParMail($autorisation);
 
-        Log::info("Rattachement présence et signature convention effectués pour carnet {$carnet->id}");
+        Log::info("Rattachement présence et signature convention effectués pour stagiaire {$stagiaire->id}");
 
         return $convention;
     }

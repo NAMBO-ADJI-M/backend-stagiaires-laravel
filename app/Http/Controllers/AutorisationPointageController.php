@@ -312,13 +312,9 @@ class AutorisationPointageController extends Controller
                 ]
             );
 
-            // Rattachement du carnet si fourni
-            if ($request->carnet_id) {
-                $carnet = CarnetDeStage::find($request->carnet_id);
-                if ($carnet) {
-                    app(\App\Services\RattachementService::class)->rattacherEtSigner($carnet, $entreprise, $autorisation);
-                }
-            }
+            // Signature de la convention et rattachement éventuel du carnet
+            $carnet = $request->carnet_id ? CarnetDeStage::find($request->carnet_id) : null;
+            app(\App\Services\RattachementService::class)->rattacherEtSigner($autorisation, $entreprise, $carnet);
 
             $invit->update(['utilise' => true]);
         } else {
@@ -338,13 +334,9 @@ class AutorisationPointageController extends Controller
                     'code_validation' => null
                 ]);
 
-                // Rattachement du carnet si fourni
-                if ($request->carnet_id) {
-                    $carnet = CarnetDeStage::find($request->carnet_id);
-                    if ($carnet) {
-                        app(\App\Services\RattachementService::class)->rattacherEtSigner($carnet, $entreprise, $autorisation);
-                    }
-                }
+                // Signature de la convention et rattachement éventuel du carnet
+                $carnet = $request->carnet_id ? CarnetDeStage::find($request->carnet_id) : null;
+                app(\App\Services\RattachementService::class)->rattacherEtSigner($autorisation, $entreprise, $carnet);
             }
         }
 
@@ -423,9 +415,9 @@ class AutorisationPointageController extends Controller
 
             if ($carnet) {
                 app(\App\Services\RattachementService::class)->rattacherEtSigner(
-                    $carnet,
+                    $autorisation,
                     $autorisation->entreprise,
-                    $autorisation
+                    $carnet
                 );
             }
         }

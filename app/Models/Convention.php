@@ -12,7 +12,10 @@ class Convention extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
+        'autorisation_pointage_id',
         'carnet_id',
+        'stagiaire_id',
+        'entreprise_id',
         'raison_sociale',
         'adresse',
         'secteur_activite',
@@ -67,6 +70,21 @@ class Convention extends Model
     public function carnet()
     {
         return $this->belongsTo(CarnetDeStage::class, 'carnet_id');
+    }
+
+    public function autorisation()
+    {
+        return $this->belongsTo(AutorisationPointage::class, 'autorisation_pointage_id');
+    }
+
+    public function stagiaire()
+    {
+        return $this->belongsTo(Stagiaire::class, 'stagiaire_id');
+    }
+
+    public function entreprise()
+    {
+        return $this->belongsTo(Entreprise::class, 'entreprise_id');
     }
 
     /**

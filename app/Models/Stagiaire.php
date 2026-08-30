@@ -97,6 +97,11 @@ class Stagiaire extends Model
         return $this->hasMany(CarnetDeStage::class);
     }
 
+    public function autorisations()
+    {
+        return $this->hasMany(AutorisationPointage::class);
+    }
+
     public function trajets()
     {
         return $this->hasMany(Trajet::class, 'conducteur_id');

@@ -304,41 +304,56 @@ class CarnetController extends Controller
     {
         $entrepriseId = $request->user()->entreprise->id;
 
-        // 1. Stagiaires déjà rattachés
-        $rattaches = CarnetDeStage::where('entreprise_id', $entrepriseId)
-            ->with(['stagiaire:id,nom,prenom,photo_profil', 'convention'])
-            ->orderByDesc('date_rattachement')
+        // 1. Stagiaires avec convention signée (Source de vérité pour "Mes Stagiaires")
+        $autorisations = \App\Models\AutorisationPointage::where('entreprise_id', $entrepriseId)
+            ->where('statut', 'CONVENTION_SIGNEE')
+            ->with(['stagiaire:id,nom,prenom,photo_profil,ecole,filiere', 'convention', 'carnet'])
             ->get()
-            ->map(function($carnet) use ($entrepriseId) {
-                $autorisation = \App\Models\AutorisationPointage::where('stagiaire_id', $carnet->stagiaire_id)
-                    ->where('entreprise_id', $entrepriseId)
-                    ->first();
+            ->map(function($auto) {
+                $carnet = $auto->carnet;
 
-                $indicateur = $carnet->indicateurAssiduite;
-                $joursPresents = $indicateur->jours_presents ?? 0;
-                $joursAttendus = $indicateur->jours_attendus ?? 0;
-                $progression = $joursAttendus > 0 ? ($joursPresents / $joursAttendus) : 0;
-
-                $statut = $autorisation ? $autorisation->statut : 'INACTIVE';
-                if ($carnet->convention && $carnet->convention->statut === 'signee') {
-                    $statut = 'CONVENTION_SIGNEE';
+                if (!$carnet) {
+                    $carnet = \App\Models\CarnetDeStage::where('stagiaire_id', $auto->stagiaire_id)
+                        ->where('entreprise_id', $auto->entreprise_id)
+                        ->first();
                 }
 
-                $carnet->autorisation_pointage_statut = $statut;
-                $carnet->presence_progress = $progression;
-                $carnet->is_linked = true;
-                return $carnet;
+                $progression = 0;
+                if ($carnet) {
+                    $indicateur = $carnet->indicateurAssiduite;
+                    $joursPresents = $indicateur->jours_presents ?? 0;
+                    $joursAttendus = $indicateur->jours_attendus ?? 0;
+                    $progression = $joursAttendus > 0 ? ($joursPresents / $joursAttendus) : 0;
+                }
+
+                return [
+                    'id' => $carnet?->id,
+                    'autorisation_id' => $auto->id,
+                    'stagiaire' => $auto->stagiaire,
+                    'poste' => $auto->poste ?? $carnet?->poste ?? 'Stagiaire',
+                    'statut' => $carnet?->statut ?? 'EN_COURS',
+                    'autorisation_pointage_statut' => 'CONVENTION_SIGNEE',
+                    'presence_progress' => $progression,
+                    'is_linked' => true,
+                    'date_debut' => $auto->date_debut?->toDateString(),
+                    'date_fin' => $auto->date_fin?->toDateString(),
+                ];
             });
 
-        // 2. Stagiaires disponibles (tous ceux qui ont un compte mais pas encore de stage actif)
-        $disponibles = \App\Models\Stagiaire::whereDoesntHave('carnets', function ($q) {
-                $q->where('statut', 'EN_COURS')->whereNotNull('entreprise_id');
+        // 2. Stagiaires avec liaison initiée mais non encore signée (Dashboard Tuteur)
+        $enAttente = \App\Models\AutorisationPointage::where('entreprise_id', $entrepriseId)
+            ->where('statut', 'EN_ATTENTE')
+            ->with(['stagiaire:id,email,nom,prenom,photo_profil,ecole,filiere'])
+            ->get();
+
+        // 3. Stagiaires disponibles (découverte)
+        // On exclut ceux qui ont déjà une autorisation (signée ou en attente) avec CETTE entreprise
+        $disponibles = \App\Models\Stagiaire::whereDoesntHave('autorisations', function ($q) use ($entrepriseId) {
+                $q->where('entreprise_id', $entrepriseId);
             })
             ->where('profil_complet', true)
             ->whereNotNull('nom')
             ->whereNotNull('prenom')
-            ->whereNotNull('ecole')
-            ->whereNotNull('filiere')
             ->select('id', 'email', 'nom', 'prenom', 'photo_profil', 'ecole', 'filiere', 'created_at')
             ->orderByDesc('created_at')
             ->get()
@@ -351,7 +366,8 @@ class CarnetController extends Controller
             });
 
         return response()->json([
-            'rattaches' => $rattaches,
+            'rattaches' => $autorisations,
+            'en_attente' => $enAttente,
             'disponibles' => $disponibles
         ]);
     }
