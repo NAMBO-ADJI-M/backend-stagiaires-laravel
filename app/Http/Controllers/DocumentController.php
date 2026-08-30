@@ -101,6 +101,7 @@ class DocumentController extends Controller
 
         $evaluation = EvaluationCompetence::where('id', $evaluationId)
             ->where('entreprise_id', $request->user()->entreprise->id)
+            ->with(['carnet.stagiaire', 'carnet.entreprise', 'carnet.metier'])
             ->firstOrFail();
 
         $carte = CarteAppuiStage::create([
@@ -110,10 +111,23 @@ class DocumentController extends Controller
             'entreprise_destinataire_nom' => $data['entreprise_destinataire_nom'],
             'entreprise_destinataire_email' => $data['entreprise_destinataire_email'],
             'recommandation' => $data['recommandation'] ?? null,
-            'document_genere' => null, // TODO : génération PDF réelle, plus tard
+            'document_genere' => null,
         ]);
 
-        return response()->json($carte, 201);
+        $pdf = Pdf::loadView('pdf.carte_appui', [
+            'carte' => $carte,
+            'evaluation' => $evaluation,
+            'carnet' => $evaluation->carnet,
+            'stagiaire' => $evaluation->carnet->stagiaire,
+            'entreprise' => $evaluation->carnet->entreprise,
+        ]);
+
+        $filename = "cartes_appui/{$carte->id}.pdf";
+        Storage::disk('public')->put($filename, $pdf->output());
+
+        $carte->update(['document_genere' => $filename]);
+
+        return response()->json($carte->fresh(), 201);
     }
 
     // Le stagiaire consulte ses attestations reçues
@@ -122,6 +136,19 @@ class DocumentController extends Controller
         return Attestation::where('stagiaire_id', $request->user()->stagiaire->id)
             ->orderByDesc('date_generation')
             ->get();
+    }
+
+    // Le stagiaire consulte ses cartes d'appui stage
+    public function mesCartesAppui(Request $request)
+    {
+        return CarteAppuiStage::where('carnet_id', function ($query) use ($request) {
+            $query->select('id')
+                ->from('carnets_de_stage')
+                ->where('stagiaire_id', $request->user()->stagiaire->id);
+        })
+        ->with(['entrepriseEmettrice', 'evaluation'])
+        ->orderByDesc('id')
+        ->get();
     }
 
     // Le stagiaire télécharge le PDF d'une attestation qui lui appartient
@@ -138,6 +165,32 @@ class DocumentController extends Controller
         return Storage::disk('public')->download(
             $attestation->document_genere,
             'attestation-stage.pdf'
+        );
+    }
+
+    // Téléchargement du PDF d'une carte d'appui
+    public function telechargerCarteAppui(Request $request, string $carteId)
+    {
+        $user = $request->user();
+        $query = CarteAppuiStage::where('id', $carteId);
+
+        if ($user->role === 'stagiaire') {
+            $query->whereHas('evaluation.carnet', function ($q) use ($user) {
+                $q->where('stagiaire_id', $user->stagiaire->id);
+            });
+        } else if ($user->role === 'entreprise') {
+            $query->where('entreprise_emettrice_id', $user->entreprise->id);
+        }
+
+        $carte = $query->firstOrFail();
+
+        if (!$carte->document_genere || !Storage::disk('public')->exists($carte->document_genere)) {
+            return response()->json(['message' => 'Document non disponible.'], 404);
+        }
+
+        return Storage::disk('public')->download(
+            $carte->document_genere,
+            'carte-appui-stage.pdf'
         );
     }
 }

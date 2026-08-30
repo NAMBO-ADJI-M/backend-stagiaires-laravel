@@ -125,7 +125,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('confirmer-depart', [PointageController::class, 'confirmerDepart']);
         });
         Route::get('mes-attestations', [DocumentController::class, 'mesAttestations']);
+        Route::get('mes-cartes-appui', [DocumentController::class, 'mesCartesAppui']);
         Route::get('attestations/{attestationId}/telecharger', [DocumentController::class, 'telechargerAttestation']);
+        Route::get('cartes-appui/{carteId}/telecharger', [DocumentController::class, 'telechargerCarteAppui']);
         Route::prefix('bilans-reflexifs')->group(function () {
             Route::post('/', [BilanReflexifController::class, 'store']);
             Route::get('carnets/{carnetId}/bilans-reflexifs', [BilanReflexifController::class, 'index']);
@@ -180,6 +182,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('carnets/{carnetId}/entrees', [CarnetController::class, 'entrees']);
         Route::get('carnets/{carnetId}/encouragements', [CarnetController::class, 'encouragements']);
         Route::get('attestations/{attestationId}/telecharger', [DocumentController::class, 'telechargerAttestation']);
+        Route::get('cartes-appui/{carteId}/telecharger', [DocumentController::class, 'telechargerCarteAppui']);
     });
 
     Route::get('criteres-savoir-etre', [CritereSavoirEtreController::class, 'index']);
