@@ -90,6 +90,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('pointage/autorisation', [AutorisationPointageController::class, 'stagiaireToggle']);
     Route::post('pointage/repondre', [AutorisationPointageController::class, 'stagiaireRepond']);
     Route::post('pointage/verifier-code', [AutorisationPointageController::class, 'verifierCode']);
+    Route::post('pointage/brouillon-liaison', [AutorisationPointageController::class, 'sauvegarderBrouillonLiaison']);
     Route::post('pointage/valider-liaison', [AutorisationPointageController::class, 'validerLiaison']);
     Route::post('pointage/decliner-liaison', [AutorisationPointageController::class, 'declinerLiaison']);
 

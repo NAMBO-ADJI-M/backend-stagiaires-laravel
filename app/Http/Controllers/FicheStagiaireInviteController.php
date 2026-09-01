@@ -48,7 +48,7 @@ class FicheStagiaireInviteController extends Controller
 
             'objet_stage' => 'nullable|string|max:500',
             'objet_stage_autre' => 'nullable|string|max:500',
-            'cursus_rattachement' => 'nullable|string|max:255',
+            'cursus_rattachement' => 'nullable|string|in:BTS,Licence,Master,Ingénieur,Doctorat,Autre',
             'stagiaire_annee_academique' => 'nullable|string|max:50',
 
             'lieu_execution' => 'nullable|string|max:255',

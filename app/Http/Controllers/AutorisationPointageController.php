@@ -76,7 +76,7 @@ class AutorisationPointageController extends Controller
 
             'objet_stage' => 'nullable|string|max:500',
             'objet_stage_autre' => 'nullable|string|max:500',
-            'cursus_rattachement' => 'nullable|string|max:255',
+            'cursus_rattachement' => 'nullable|string|in:BTS,Licence,Master,Ingénieur,Doctorat,Autre',
             'stagiaire_annee_academique' => 'nullable|string|max:50',
 
             'lieu_execution' => 'nullable|string|max:255',
@@ -222,6 +222,44 @@ class AutorisationPointageController extends Controller
     }
 
     /**
+     * Sauvegarde un brouillon des informations du stagiaire pendant la saisie.
+     * Pas de signature ni de changement de statut ici.
+     */
+    public function sauvegarderBrouillonLiaison(Request $request)
+    {
+        $request->validate([
+            'entreprise_id' => 'required|uuid|exists:entreprises,id',
+            'nom' => 'sometimes|string|max:100',
+            'prenom' => 'sometimes|string|max:100',
+            'stagiaire_adresse' => 'sometimes|string|max:255',
+            'stagiaire_telephone' => 'sometimes|string|max:20',
+        ]);
+
+        $stagiaire = $request->user()->stagiaire;
+
+        $stagiaire->update(array_filter([
+            'nom' => $request->nom,
+            'prenom' => $request->prenom,
+            'domicile_adresse' => $request->stagiaire_adresse,
+            'telephone' => $request->stagiaire_telephone,
+        ]));
+
+        // On peut aussi mettre à jour les champs sur l'autorisation elle-même si elle existe déjà
+        $autorisation = AutorisationPointage::where('stagiaire_id', $stagiaire->id)
+            ->where('entreprise_id', $request->entreprise_id)
+            ->first();
+
+        if ($autorisation) {
+            $autorisation->update(array_filter([
+                'stagiaire_adresse' => $request->stagiaire_adresse,
+                'stagiaire_telephone' => $request->stagiaire_telephone,
+            ]));
+        }
+
+        return response()->json(['message' => 'Brouillon sauvegardé.']);
+    }
+
+    /**
      * Étape 2 Stagiaire : Valide définitivement la liaison.
      */
     public function validerLiaison(Request $request)
@@ -229,10 +267,10 @@ class AutorisationPointageController extends Controller
         $request->validate([
             'code' => 'required|string',
             'entreprise_id' => 'required|uuid|exists:entreprises,id',
-            'nom' => 'required|string|max:100',
-            'prenom' => 'required|string|max:100',
-            'stagiaire_adresse' => 'required|string|max:255',
-            'stagiaire_telephone' => 'required|string|max:20',
+            'nom' => 'sometimes|required|string|max:100',
+            'prenom' => 'sometimes|required|string|max:100',
+            'stagiaire_adresse' => 'sometimes|required|string|max:255',
+            'stagiaire_telephone' => 'sometimes|required|string|max:20',
             'stagiaire_annee_academique' => 'nullable|string|max:50',
             'carnet_id' => 'nullable|uuid|exists:carnets_de_stage,id',
         ]);
@@ -242,13 +280,13 @@ class AutorisationPointageController extends Controller
         $entreprise = Entreprise::findOrFail($request->entreprise_id);
 
         // Mise à jour du profil stagiaire (coordonnées récoltées lors de la signature)
-        $stagiaire->update([
+        $stagiaire->update(array_filter([
             'nom' => $request->nom,
             'prenom' => $request->prenom,
             'domicile_adresse' => $request->stagiaire_adresse,
             'telephone' => $request->stagiaire_telephone,
-            'profil_complet' => true
-        ]);
+            'profil_complet' => ($request->has(['nom', 'prenom', 'stagiaire_adresse', 'stagiaire_telephone']))
+        ]));
 
         // Rechercher si c'est une invitation
         $invit = \App\Models\FicheStagiaireInvite::where('code_invitation', $code)->first();

@@ -41,7 +41,6 @@
     <div class="row"><span class="label">Contact Représentant :</span> {{ $autorisation->representant_legal_contact ?? 'N/A' }}</div>
 
     <div class="row" style="margin-top: 10px;"><span class="label">Le Stagiaire :</span> <strong>{{ $stagiaire->prenom }} {{ $stagiaire->nom }}</strong></div>
-    <div class="row"><span class="label">Date de naissance :</span> {{ $autorisation->stagiaire_date_naissance ?? $stagiaire->date_naissance }}</div>
     <div class="row"><span class="label">Téléphone Stagiaire :</span> {{ $autorisation->stagiaire_telephone ?? $stagiaire->telephone }}</div>
     <div class="row"><span class="label">Établissement d'étude :</span> {{ $autorisation->etablissement_nom ?? $stagiaire->ecole }}</div>
     <div class="row"><span class="label">Année académique :</span> {{ $autorisation->stagiaire_annee_academique ?? 'N/A' }}</div>
@@ -87,8 +86,6 @@
     <div class="row"><span class="label">Email Tuteur :</span> {{ $autorisation->tuteur_email }}</div>
     <div class="row"><span class="label">Téléphone Tuteur :</span> {{ $autorisation->tuteur_telephone }}</div>
 
-    <div class="row" style="margin-top: 10px;"><span class="label">Référent Pédagogique :</span> {{ $autorisation->referent_pedagogique_nom }}</div>
-    <div class="row"><span class="label">Contact Référent :</span> {{ $autorisation->referent_pedagogique_contact }}</div>
     @if($autorisation->modalites_suivi_detail)
         <div class="row"><span class="label">Détail du suivi :</span></div>
         <div class="content">{{ $autorisation->modalites_suivi_detail }}</div>

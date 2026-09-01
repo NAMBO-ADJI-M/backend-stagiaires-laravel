@@ -1,45 +1,25 @@
-# Walkthrough - Correction de la relation 'carnet' manquante
+## Corrections formulaire Convention + PDF + Autosave
 
-L'erreur `RelationNotFoundException: Call to undefined relationship [carnet] on model [App\Models\AutorisationPointage]` a été corrigée. Cette erreur bloquait le Dashboard Tuteur car la progression de l'assiduité du stagiaire est calculée via son carnet de stage.
+### 1. Champ "cursus" -> liste de choix (dropdown)
+Le champ "cursus" a été transformé d'un texte libre en une liste déroulante pour assurer la cohérence des données.
+- **Liste proposée** : BTS, Licence, Master, Ingénieur, Doctorat, Autre.
+- **Backend** : Mise à jour de `AutorisationPointageController` et `FicheStagiaireInviteController` avec une validation `in:BTS,Licence,Master,Ingénieur,Doctorat,Autre`.
+- **Flutter** : Utilisation de `DropdownButtonFormField` dans `add_stagiaire_dialog.dart` et `liaison_stagiaire_dialog.dart`.
 
-## Changements effectués
+### 2. Retrait de champs (Formulaire + PDF)
+Les champs "Date de naissance" et "Référent pédagogique" ont été retirés du parcours stagiaire.
+- **Flutter** : Suppression des champs dans `home_screen.dart`.
+- **Backend** : Mise à jour de la validation dans `AutorisationPointageController@validerLiaison` pour rendre ces champs optionnels.
+- **Template PDF** : Suppression des lignes correspondantes dans `convention.blade.php` pour éviter d'afficher des libellés vides. La mise en page a été préservée.
 
-### Backend (Laravel)
+### 3. Séparation des endpoints pour l'Autosave
+Pour éviter de déclencher la signature de la convention à chaque frappe de clavier, les responsabilités ont été séparées.
+- **Brouillon (Autosave)** : Un nouvel endpoint `POST /api/pointage/brouillon-liaison` a été créé. Il met à jour uniquement le profil du stagiaire et les coordonnées de l'autorisation, sans changer le statut ni générer de PDF.
+- **Validation Finale (Signature)** : L'endpoint `valider-liaison` n'est plus appelé que lors du clic sur le bouton final de signature.
+- **Flutter** : `InternshipService` intègre maintenant `sauvegarderBrouillonLiaison`, utilisé par le `debounceTimer` dans `home_screen.dart`.
 
-#### 1. Modèle `AutorisationPointage`
-Ajout de la relation `belongsTo` vers `CarnetDeStage`. La table `autorisations_pointage` contient déjà une colonne `carnet_id` (ajoutée par une migration précédente).
-
-```php
-// app/Models/AutorisationPointage.php
-public function carnet()
-{
-    return $this->belongsTo(CarnetDeStage::class, 'carnet_id');
-}
-```
-
-#### 2. `CarnetController`
-Optimisation de la méthode `listeEntreprise()` :
-- Utilisation de la relation `carnet` via `with()` pour éviter le N+1.
-- Eager-loading de `carnet.indicateurAssiduite` pour obtenir directement les données de progression.
-- Suppression du fallback manuel (recherche par `stagiaire_id` et `entreprise_id`) qui devenait inutile et risqué.
-
-#### 3. Modèles `Attestation` et `CarteAppuiStage`
-Ajout préventif de la relation `carnet()` sur ces modèles qui possèdent également une colonne `carnet_id` mais n'avaient pas la relation Eloquent définie.
-
-### Frontend (Flutter)
-- Une erreur de compilation a été signalée dans `home_screen.dart` à cause d'un mot-clé `si` au lieu de `if`. Après vérification, le fichier actuel contient bien `if`. Si l'erreur persiste lors d'un build local, il est conseillé de faire un `flutter clean`.
-
-## Vérification effectuée
-
-### Grep des occurrences
-Une recherche exhaustive a été menée pour identifier tous les appels à `with('carnet')` et `->carnet`. 
-- **Modèles vérifiés** : `AutorisationPointage`, `Convention`, `EvaluationCompetence`, `EntreeCarnet`, `Attestation`, `CarteAppuiStage`.
-- **Contrôleurs vérifiés** : `CarnetController`, `ConventionController`, `DocumentController`.
-
-Toutes les occurrences utilisent désormais des modèles où la relation `carnet()` est correctement définie.
-
-### Justification du choix (Option B)
-L'Option B (ajouter la relation) a été choisie plutôt que l'Option A (retirer l'appel) car le Dashboard Tuteur utilise réellement les données du carnet (notamment l'assiduité) pour afficher l'état d'avancement des stagiaires dans la liste de l'entreprise.
+### 4. Correction compilation Flutter
+Correction d'une erreur de compilation dans `home_screen.dart` liée à l'utilisation de variables locales `lat` et `lng` après un changement de contexte.
 
 ---
-**Note :** Le Dashboard Tuteur devrait maintenant se charger correctement (Code 200) sans erreur 500.
+**Note :** Le scénario "plusieurs autosaves puis une signature finale" a été sécurisé : seule l'action finale déclenche le statut `CONVENTION_SIGNEE`.
