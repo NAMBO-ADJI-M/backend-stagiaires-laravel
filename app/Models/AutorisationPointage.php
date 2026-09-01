@@ -76,4 +76,9 @@ class AutorisationPointage extends Model
     {
         return $this->hasOne(Convention::class, 'autorisation_pointage_id');
     }
+
+    public function carnet()
+    {
+        return $this->belongsTo(CarnetDeStage::class, 'carnet_id');
+    }
 }

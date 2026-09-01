@@ -307,16 +307,10 @@ class CarnetController extends Controller
         // 1. Stagiaires avec convention signée (Source de vérité pour "Mes Stagiaires")
         $autorisations = \App\Models\AutorisationPointage::where('entreprise_id', $entrepriseId)
             ->where('statut', 'CONVENTION_SIGNEE')
-            ->with(['stagiaire:id,nom,prenom,photo_profil,ecole,filiere', 'convention', 'carnet'])
+            ->with(['stagiaire:id,nom,prenom,photo_profil,ecole,filiere', 'convention', 'carnet.indicateurAssiduite'])
             ->get()
             ->map(function($auto) {
                 $carnet = $auto->carnet;
-
-                if (!$carnet) {
-                    $carnet = \App\Models\CarnetDeStage::where('stagiaire_id', $auto->stagiaire_id)
-                        ->where('entreprise_id', $auto->entreprise_id)
-                        ->first();
-                }
 
                 $progression = 0;
                 if ($carnet) {
