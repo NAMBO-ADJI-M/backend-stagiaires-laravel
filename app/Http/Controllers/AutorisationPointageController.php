@@ -383,6 +383,7 @@ class AutorisationPointageController extends Controller
                 'message' => 'Convention signée et liaison établie !',
                 'statut' => 'CONVENTION_SIGNEE',
                 'autorisation_id' => $autorisation->id,
+                'carnet_id' => $autorisation->carnet_id,
             ]);
         }
 

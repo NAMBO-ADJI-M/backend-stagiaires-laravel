@@ -60,6 +60,11 @@ class AutorisationPointage extends Model
         'jours_presence' => 'array',
         'tuteur_valide_le' => 'datetime',
         'stagiaire_valide_le' => 'datetime',
+        'lieu_execution_lat' => 'float',
+        'lieu_execution_lng' => 'float',
+        'nombre_mois_stage' => 'integer',
+        'gratification_prevue' => 'boolean',
+        'gratification_montant' => 'float',
     ];
 
     public function stagiaire()

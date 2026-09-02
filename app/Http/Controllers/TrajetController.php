@@ -31,14 +31,16 @@ class TrajetController extends Controller
             $stagiaire = $user->stagiaire;
 
             if (!$stagiaire) {
-                // Création de secours du profil stagiaire si manquant
-                $stagiaire = Stagiaire::create([
-                    'user_id' => $user->id,
-                    'email' => $user->email,
-                    'nom' => 'Utilisateur',
-                    'prenom' => 'StageLink',
-                    'profil_complet' => false,
-                ]);
+                // Récupération de secours ou création du profil stagiaire
+                $stagiaire = Stagiaire::updateOrCreate(
+                    ['user_id' => $user->id],
+                    [
+                        'email' => $user->email,
+                        'nom' => 'Utilisateur',
+                        'prenom' => 'StageLink',
+                        'profil_complet' => false,
+                    ]
+                );
             }
 
             $trajet = Trajet::create([

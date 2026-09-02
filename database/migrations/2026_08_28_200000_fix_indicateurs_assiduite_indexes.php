@@ -12,11 +12,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('indicateurs_assiduite', function (Blueprint $table) {
-            // 1. Suppression de la contrainte unique sur carnet_id
-            // Note: On utilise le nom standard Laravel ou celui défini à la création
-            $table->dropUnique(['carnet_id']);
+        // Rendre la suppression de l'index idempotente
+        $indexExists = collect(DB::select("SHOW INDEX FROM indicateurs_assiduite"))
+            ->contains('Key_name', 'indicateurs_assiduite_carnet_id_unique');
 
+        if ($indexExists) {
+            Schema::table('indicateurs_assiduite', function (Blueprint $table) {
+                $table->dropUnique(['carnet_id']);
+            });
+        }
+
+        Schema::table('indicateurs_assiduite', function (Blueprint $table) {
             // 2. On s'assure que autorisation_pointage_id est bien unique
             // (Si la migration précédente n'a pas réussi à le mettre, on le force ici)
             try {

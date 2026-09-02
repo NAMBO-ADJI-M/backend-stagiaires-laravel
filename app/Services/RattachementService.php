@@ -55,7 +55,6 @@ class RattachementService
                 'entreprise_id' => $entreprise->id,
                 'raison_sociale' => $autorisation->raison_sociale_custom ?? $entreprise->raison_sociale,
                 'adresse' => $autorisation->adresse_custom ?? $entreprise->adresse_libelle,
-                'situation_geographique' => $autorisation->adresse_custom ?? $entreprise->adresse_libelle, // champ requis par migration
                 'secteur_activite' => $autorisation->secteur_activite_custom ?? $entreprise->secteur,
 
                 'representant_legal_nom' => $autorisation->representant_legal_nom,
@@ -76,7 +75,7 @@ class RattachementService
                 'lieu_execution' => $autorisation->lieu_execution,
                 'lieu_execution_lat' => $autorisation->lieu_execution_lat,
                 'lieu_execution_lng' => $autorisation->lieu_execution_lng,
-                'modalites_suivi' => $autorisation->modalites_suivi_detail ?? 'Suivi via application StageLink',
+                'modalites_suivi' => 'Suivi via application StageLink',
 
                 'gratification_prevue' => $autorisation->gratification_prevue,
                 'gratification_montant' => $autorisation->gratification_montant,

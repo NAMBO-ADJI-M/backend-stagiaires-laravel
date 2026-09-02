@@ -79,6 +79,15 @@ class FicheStagiaireInviteController extends Controller
             'date_expiration' => now()->addDays(30),
         ]));
 
+        // Si une demande de rattachement existait pour cet email, on la marque comme traitée
+        $existingStagiaire = \App\Models\Stagiaire::where('email', $data['email'])->first();
+        if ($existingStagiaire) {
+            \App\Models\DemandeRattachement::where('stagiaire_id', $existingStagiaire->id)
+                ->where('entreprise_id', $request->user()->entreprise->id)
+                ->where('statut', 'en_attente')
+                ->update(['statut' => 'traitee']);
+        }
+
         $entrepriseNom = $request->user()->entreprise->raison_sociale ?? 'Votre entreprise';
 
         // 1. Envoi par e-mail (Brevo)

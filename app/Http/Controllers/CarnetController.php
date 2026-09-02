@@ -54,7 +54,7 @@ class CarnetController extends Controller
             'niveau_formation_id' => $validated['niveau_formation_id'],
             'poste' => $validated['poste'],
             'entreprise_nom' => $validated['entreprise_nom'],
-            'statut' => 'EN_ATTENTE',
+            'statut' => 'EN_COURS',
             'date_debut' => $validated['date_debut'],
             'date_fin' => $validated['date_fin'],
             'date_creation' => now(),
