@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Storage;
 
 class DocumentController extends Controller
 {
-    // Génère la convention de stage au format PDF à partir des données de liaison
     public function genererConvention(Request $request, string $autorisationId)
     {
         $user = $request->user();
@@ -39,6 +38,79 @@ class DocumentController extends Controller
         ]);
 
         return $pdf->download("convention-stage-{$autorisation->id}.pdf");
+    }
+
+    public function getApercuConvention(Request $request, string $id)
+    {
+        $user = $request->user();
+
+        // 1. Chercher d'abord dans les autorisations réelles
+        $auto = \App\Models\AutorisationPointage::where('id', $id)
+            ->with(['entreprise', 'stagiaire'])
+            ->first();
+
+        if (!$auto) {
+            // 2. Sinon chercher dans les invitations (Fiches)
+            $invit = \App\Models\FicheStagiaireInvite::where('id', $id)
+                ->with(['entreprise'])
+                ->firstOrFail();
+
+            return response()->json([
+                'reference' => "PROJET-CONV-" . substr($invit->entreprise_id, 0, 8),
+                'parties' => [
+                    'entreprise' => $invit->raison_sociale_custom ?? $invit->entreprise->raison_sociale,
+                    'stagiaire' => $user->stagiaire->prenom . ' ' . $user->stagiaire->nom,
+                    'etablissement' => $invit->etablissement_nom ?? $user->stagiaire->ecole,
+                ],
+                'details_stage' => [
+                    'objet' => $invit->objet_stage,
+                    'cursus' => $invit->cursus_rattachement,
+                    'periode' => "Du " . $invit->date_debut->format('d/m/Y') . " au " . $invit->date_fin->format('d/m/Y'),
+                    'lieu' => $invit->lieu_execution ?? 'Locaux de l\'entreprise',
+                ],
+                'conditions' => [
+                    'duree_hebdo' => $invit->duree_hebdomadaire,
+                    'jours_presence' => is_array($invit->jours_presence) ? implode(', ', $invit->jours_presence) : $invit->jours_presence,
+                    'teletravail' => $invit->teletravail_modalites ?? 'Non défini',
+                    'gratification' => $invit->gratification_prevue
+                        ? $invit->gratification_montant . " € (" . $invit->gratification_periodicite . ")"
+                        : "Sans gratification",
+                ],
+                'encadrement' => [
+                    'tuteur' => ($invit->tuteur_nom ?? $invit->tuteur_designe) . ' ' . $invit->tuteur_prenom,
+                    'referent' => $invit->referent_pedagogique_nom,
+                    'contact_referent' => $invit->referent_pedagogique_contact,
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'reference' => "CONV-" . substr($auto->entreprise_id, 0, 8),
+            'parties' => [
+                'entreprise' => $auto->raison_sociale_custom ?? $auto->entreprise->raison_sociale,
+                'stagiaire' => $auto->stagiaire->prenom . ' ' . $auto->stagiaire->nom,
+                'etablissement' => $auto->etablissement_nom ?? $auto->stagiaire->ecole,
+            ],
+            'details_stage' => [
+                'objet' => $auto->objet_stage,
+                'cursus' => $auto->cursus_rattachement,
+                'periode' => "Du " . $auto->date_debut->format('d/m/Y') . " au " . $auto->date_fin->format('d/m/Y'),
+                'lieu' => $auto->lieu_execution ?? 'Locaux de l\'entreprise',
+            ],
+            'conditions' => [
+                'duree_hebdo' => $auto->duree_hebdomadaire,
+                'jours_presence' => is_array($auto->jours_presence) ? implode(', ', $auto->jours_presence) : $auto->jours_presence,
+                'teletravail' => $auto->teletravail_modalites ?? 'Non défini',
+                'gratification' => $auto->gratification_prevue
+                    ? $auto->gratification_montant . " € (" . $auto->gratification_periodicite . ")"
+                    : "Sans gratification",
+            ],
+            'encadrement' => [
+                'tuteur' => ($auto->tuteur_nom ?? $auto->tuteur_designe) . ' ' . $auto->tuteur_prenom,
+                'referent' => $auto->referent_pedagogique_nom,
+                'contact_referent' => $auto->referent_pedagogique_contact,
+            ],
+        ]);
     }
 
     // Génère l'attestation seule (le tuteur peut s'arrêter là)

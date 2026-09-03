@@ -181,6 +181,7 @@ class AutorisationPointageController extends Controller
                 'stagiaire_nom' => $stagiaire->nom,
                 'stagiaire_prenom' => $stagiaire->prenom,
                 'stagiaire_email' => $user->email,
+                'invitation_id' => $invit->id,
             ]);
         }
 
@@ -215,6 +216,7 @@ class AutorisationPointageController extends Controller
                 'stagiaire_nom' => $stagiaire->nom,
                 'stagiaire_prenom' => $stagiaire->prenom,
                 'stagiaire_email' => $user->email,
+                'autorisation_id' => $autorisation->id,
             ]);
         }
 

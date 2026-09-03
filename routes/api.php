@@ -22,37 +22,6 @@ use App\Http\Controllers\TestEmailController;
 use App\Http\Controllers\AutorisationPointageController;
 use App\Http\Controllers\ConventionController;
 use App\Http\Controllers\DemandeRattachementController;
-
-// ================================================
-// 🛠️ ROUTE DE SECOURS (PUBLIC)
-// ================================================
-Route::any('debug/clear-stagiaires', function() {
-    try {
-        // Nettoyer tout le cache en premier
-        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-
-        // Forcer la migration
-        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-
-        // Nettoyage complet (Ordre respectant les contraintes)
-        \App\Models\EntreeCarnet::query()->delete();
-        \App\Models\IndicateurAssiduite::query()->delete();
-        \App\Models\ProgressionCompetence::query()->delete();
-        \App\Models\CarnetDeStage::query()->delete();
-        \App\Models\Stagiaire::query()->delete();
-        \App\Models\User::where('role', 'stagiaire')->delete();
-        \App\Models\FicheStagiaireInvite::query()->delete();
-        \App\Models\AutorisationPointage::query()->delete();
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Système réparé : Cache vidé, BDD migrée et données nettoyées.'
-        ]);
-    } catch (\Exception $e) {
-        return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
-    }
-});
-
 // ================================================
 // 🔐 ROUTE LOGIN POUR SANCTUM
 // ================================================
@@ -60,7 +29,7 @@ Route::get('/login', function () {
     return response()->json(['message' => 'Non authentifié.'], 401);
 })->name('login');
 
-Route::get('/test-email', [TestEmailController::class, 'sendTestEmail']);
+
 
 Route::prefix('referentiel')->group(function () {
     Route::get('domaines', [ReferentielController::class, 'domaines']);
@@ -153,6 +122,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::get('documents/liaison/{autorisationId}/convention-pdf', [DocumentController::class, 'genererConvention']);
+    Route::get('documents/liaison/{autorisationId}/convention-apercu', [DocumentController::class, 'getApercuConvention']);
 
     Route::middleware('profil:entreprise')->group(function () {
         Route::post('entreprise/profil', [AuthController::class, 'completeEntrepriseProfile']);
