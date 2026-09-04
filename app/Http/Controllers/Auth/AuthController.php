@@ -372,11 +372,16 @@ class AuthController extends Controller
             if ($carnet && $carnet->entreprise_id) {
                 $auto = \App\Models\AutorisationPointage::where('stagiaire_id', $user->stagiaire->id)
                     ->where('entreprise_id', $carnet->entreprise_id)
+                    ->with('entreprise:id,raison_sociale,heure_fin_journee')
                     ->first();
                 $data['autorisation_pointage'] = [
+                    'id' => $auto?->id,
                     'entreprise_id' => $carnet->entreprise_id,
                     'entreprise_nom' => $carnet->entreprise_nom,
                     'statut' => $auto ? $auto->statut : 'INACTIVE',
+                    'heure_fin_journee' => $auto?->entreprise?->heure_fin_journee ?? '17:30:00',
+                    'lieu_execution_lat' => $auto?->lieu_execution_lat,
+                    'lieu_execution_lng' => $auto?->lieu_execution_lng,
                 ];
             }
         }

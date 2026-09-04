@@ -50,11 +50,21 @@ class DemandeRattachementController extends Controller
             ]);
         }
 
-        $count = DemandeRattachement::where('stagiaire_id', $stagiaire->id)->count();
+        $count = DemandeRattachement::where('stagiaire_id', $stagiaire->id)
+            ->where('statut', 'en_attente')
+            ->count();
+
+        $hasAuto = \App\Models\AutorisationPointage::where('stagiaire_id', $stagiaire->id)->exists();
+
+        $hasInvit = \App\Models\FicheStagiaireInvite::where('email', $user->email)
+            ->where('utilise', false)
+            ->exists();
 
         return response()->json([
-            'has_rattachement' => $count > 0,
-            'count' => $count
+            'has_rattachement' => ($count > 0 || $hasAuto || $hasInvit),
+            'count' => $count,
+            'has_auto' => $hasAuto,
+            'has_invit' => $hasInvit
         ]);
     }
 

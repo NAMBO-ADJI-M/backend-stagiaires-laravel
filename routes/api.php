@@ -63,8 +63,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('pointage/valider-liaison', [AutorisationPointageController::class, 'validerLiaison']);
     Route::post('pointage/decliner-liaison', [AutorisationPointageController::class, 'declinerLiaison']);
 
-    Route::get('pointage/{carnetId}/historique', [PointageController::class, 'historique']);
-    Route::get('pointage/historique/carnet/{carnetId}', [PointageController::class, 'historique']);
     Route::get('pointage/historique/autorisation/{autorisationId}', [PointageController::class, 'historique']);
 
     Route::post('entreprise/demander-suivi', [AutorisationPointageController::class, 'entrepriseDemande']);

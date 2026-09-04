@@ -357,6 +357,9 @@ class AutorisationPointageController extends Controller
             app(\App\Services\RattachementService::class)->rattacherEtSigner($autorisation, $entreprise, $carnet);
 
             $invit->update(['utilise' => true]);
+
+            // Invalidation cache stats entreprise
+            \Illuminate\Support\Facades\Cache::forget('entreprise_dashboard_stats_v2');
         } else {
             // Sinon chercher liaison directe
             $autorisation = AutorisationPointage::where('code_validation', $code)
@@ -377,6 +380,9 @@ class AutorisationPointageController extends Controller
                 // Signature de la convention et rattachement éventuel du carnet
                 $carnet = $request->carnet_id ? CarnetDeStage::find($request->carnet_id) : null;
                 app(\App\Services\RattachementService::class)->rattacherEtSigner($autorisation, $entreprise, $carnet);
+
+                // Invalidation cache stats entreprise
+                \Illuminate\Support\Facades\Cache::forget('entreprise_dashboard_stats_v2');
             }
         }
 

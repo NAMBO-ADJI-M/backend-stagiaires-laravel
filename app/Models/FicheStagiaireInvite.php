@@ -36,6 +36,8 @@ class FicheStagiaireInvite extends Model
         'nombre_mois_stage' => 'integer',
         'gratification_prevue' => 'boolean',
         'gratification_montant' => 'float',
+        'date_debut' => 'date',
+        'date_fin' => 'date',
     ];
 
     public function entreprise()

@@ -34,12 +34,11 @@ class RattachementService
             'stagiaire_valide_le' => $autorisation->stagiaire_valide_le ?? now(),
         ]);
 
-        // 2. Si un carnet est fourni, on active le suivi dessus
+        // 2. Le carnet reste privé au stagiaire, on ne le rattache plus physiquement à l'entreprise.
+        // Seul l'autorisation_pointage fait le lien.
+        // On s'assure juste que le carnet est en statut EN_COURS s'il est fourni.
         if ($carnet) {
             $carnet->update([
-                'entreprise_id' => $entreprise->id,
-                'autorisation_suivi' => true,
-                'date_rattachement' => now(),
                 'statut' => 'EN_COURS',
                 'date_debut' => $autorisation->date_debut,
                 'date_fin' => $autorisation->date_fin,

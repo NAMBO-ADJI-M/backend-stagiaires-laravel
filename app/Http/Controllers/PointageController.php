@@ -78,25 +78,28 @@ class PointageController extends Controller
         $dejaOuverte = EntreeCarnet::where('autorisation_pointage_id', $autorisation->id)
             ->where('type', 'PRESENCE')
             ->whereNull('date_fin')
-            ->exists();
+            ->first();
 
         if ($dejaOuverte) {
-            throw ValidationException::withMessages([
-                'carnet_id' => 'Une présence est déjà en cours.',
-            ]);
+            // Si une présence est ouverte, on ne fait rien (on est déjà là)
+            return response()->json($dejaOuverte, 200);
         }
 
-        // Requalification automatique : si la dernière entrée terminée était en attente (ou sortie récente),
-        // ce retour confirme qu'il s'agissait d'une pause.
-        $derniereSortieEnAttente = EntreeCarnet::where('autorisation_pointage_id', $autorisation->id)
+        // Requalification automatique : si la dernière entrée terminée était une sortie provisoire (silencieuse),
+        // ce retour annule le timestamp de fin pour reprendre la session.
+        $derniereSortieSilencieuse = EntreeCarnet::where('autorisation_pointage_id', $autorisation->id)
             ->where('type', 'PRESENCE')
             ->whereNotNull('date_fin')
-            ->where('statut_cloture', 'EN_ATTENTE')
+            ->where('statut_cloture', 'SORTIE_SILENCIEUSE')
             ->latest('date_fin')
             ->first();
 
-        if ($derniereSortieEnAttente) {
-            $derniereSortieEnAttente->update(['statut_cloture' => 'PAUSE_CONFIRMEE']);
+        if ($derniereSortieSilencieuse) {
+            $derniereSortieSilencieuse->update([
+                'date_fin' => null,
+                'statut_cloture' => 'EN_ATTENTE'
+            ]);
+            return response()->json($derniereSortieSilencieuse, 200);
         }
 
         $entree = EntreeCarnet::create([
@@ -159,14 +162,12 @@ class PointageController extends Controller
             ->first();
 
         if (!$entree) {
-            throw ValidationException::withMessages([
-                'id' => 'Aucune présence en cours à clôturer.',
-            ]);
+            return response()->json(['message' => 'Aucune présence en cours à clôturer.'], 200);
         }
 
         $entree->update([
             'date_fin' => now(),
-            'statut_cloture' => 'EN_ATTENTE',
+            'statut_cloture' => 'SORTIE_SILENCIEUSE', // Silencieux, le cron ou le retour tranchera
         ]);
 
         return response()->json($entree->fresh());
@@ -261,23 +262,16 @@ class PointageController extends Controller
     }
 
     // Liste les entrées de présence d'un carnet (pour vérifier visuellement)
-    public function historique(Request $request, ?string $carnetId = null, ?string $autorisationId = null)
+    public function historique(Request $request, ?string $autorisationId = null)
     {
         $user = $request->user();
-        $autorisation = null;
+        $idAuto = $autorisationId ?: $request->route('autorisationId');
 
-        // On récupère les IDs soit par arguments (positionnel), soit par nom de paramètre de route
-        $idAutre = $autorisationId ?: $request->route('autorisationId');
-        $idCarnet = $carnetId ?: $request->route('carnetId');
-
-        if ($idAutre) {
-            $autorisation = \App\Models\AutorisationPointage::findOrFail($idAutre);
-        } elseif ($idCarnet) {
-            $carnet = CarnetDeStage::findOrFail($idCarnet);
-            $autorisation = \App\Models\AutorisationPointage::where('carnet_id', $carnet->id)->firstOrFail();
-        } else {
-            return response()->json(['message' => 'Identifiant manquant.'], 422);
+        if (!$idAuto) {
+            return response()->json(['message' => 'Identifiant d\'autorisation de pointage manquant.'], 422);
         }
+
+        $autorisation = \App\Models\AutorisationPointage::findOrFail($idAuto);
 
         // Autorisation : Stagiaire propriétaire ou Tuteur autorisé
         $isProprietaire = $user->role === 'stagiaire' && $autorisation->stagiaire_id === $user->stagiaire->id;
@@ -304,6 +298,7 @@ class PointageController extends Controller
             return response()->json(['message' => 'L\'accès au suivi de présence est bloqué. La convention doit être signée par les deux parties.'], 403);
         }
 
+        // Filtrage strict sur autorisation_pointage_id (fiabilisé par migration de backfill)
         return EntreeCarnet::where('autorisation_pointage_id', $autorisation->id)
             ->where('type', 'PRESENCE')
             ->orderByDesc('date_debut')

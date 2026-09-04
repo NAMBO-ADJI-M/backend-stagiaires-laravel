@@ -14,7 +14,7 @@ class ConcluerPausesDeparts extends Command
     public function handle(): void
     {
         $entreesEnAttente = EntreeCarnet::where('type', 'PRESENCE')
-            ->where('statut_cloture', 'EN_ATTENTE')
+            ->whereIn('statut_cloture', ['EN_ATTENTE', 'SORTIE_SILENCIEUSE'])
             ->whereNotNull('date_fin')
             ->with('carnet.entreprise')
             ->get();
@@ -24,12 +24,19 @@ class ConcluerPausesDeparts extends Command
 
         foreach ($entreesEnAttente as $entree) {
             $entreprise = $entree->carnet?->entreprise;
+
+            // Si pas de carnet direct, on cherche via l'autorisation
+            if (!$entreprise && $entree->autorisation_pointage_id) {
+                $auto = \App\Models\AutorisationPointage::with('entreprise')->find($entree->autorisation_pointage_id);
+                $entreprise = $auto?->entreprise;
+            }
+
             $now = Carbon::now();
             $dateFin = Carbon::parse($entree->date_fin);
             $minutesDepuisSortie = $dateFin->diffInMinutes($now);
 
             // Y a-t-il eu un retour dans le rayon après cette sortie ?
-            $retourConstate = EntreeCarnet::where('carnet_id', $entree->carnet_id)
+            $retourConstate = EntreeCarnet::where('autorisation_pointage_id', $entree->autorisation_pointage_id)
                 ->where('type', 'PRESENCE')
                 ->where('date_debut', '>', $entree->date_fin)
                 ->exists();
@@ -41,12 +48,12 @@ class ConcluerPausesDeparts extends Command
             }
 
             $heureActuelle = $now->format('H:i:s');
-            $heureFinJournee = $entreprise?->heure_fin_journee;
+            $heureFinJournee = $entreprise?->heure_fin_journee ?? '17:30:00';
 
             // Clôture en départ si :
-            // 1. Plus de 45 minutes sans retour
+            // 1. Plus de 60 minutes sans retour (marge pour pause déjeuner)
             // 2. Ou l'heure de fin de journée de l'entreprise est atteinte/dépassée
-            if ($minutesDepuisSortie >= 45 || ($heureFinJournee && $heureActuelle >= $heureFinJournee)) {
+            if ($minutesDepuisSortie >= 60 || $heureActuelle >= $heureFinJournee) {
                 $entree->update(['statut_cloture' => 'DEPART_CONFIRME']);
                 $nbDepart++;
             }

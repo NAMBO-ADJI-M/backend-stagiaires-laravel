@@ -65,7 +65,7 @@ class DocumentController extends Controller
                 'details_stage' => [
                     'objet' => $invit->objet_stage,
                     'cursus' => $invit->cursus_rattachement,
-                    'periode' => "Du " . $invit->date_debut->format('d/m/Y') . " au " . $invit->date_fin->format('d/m/Y'),
+                    'periode' => "Du " . \Carbon\Carbon::parse($invit->date_debut)->format('d/m/Y') . " au " . \Carbon\Carbon::parse($invit->date_fin)->format('d/m/Y'),
                     'lieu' => $invit->lieu_execution ?? 'Locaux de l\'entreprise',
                 ],
                 'conditions' => [
@@ -94,7 +94,7 @@ class DocumentController extends Controller
             'details_stage' => [
                 'objet' => $auto->objet_stage,
                 'cursus' => $auto->cursus_rattachement,
-                'periode' => "Du " . $auto->date_debut->format('d/m/Y') . " au " . $auto->date_fin->format('d/m/Y'),
+                'periode' => "Du " . \Carbon\Carbon::parse($auto->date_debut)->format('d/m/Y') . " au " . \Carbon\Carbon::parse($auto->date_fin)->format('d/m/Y'),
                 'lieu' => $auto->lieu_execution ?? 'Locaux de l\'entreprise',
             ],
             'conditions' => [

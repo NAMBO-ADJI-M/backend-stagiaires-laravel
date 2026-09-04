@@ -157,10 +157,17 @@ class CarnetController extends Controller
         }
 
         if ($user->role === 'entreprise'
-            && $user->entreprise
-            && $carnet->entreprise_id !== null
-            && $carnet->entreprise_id === $user->entreprise->id) {
-            return;
+            && $user->entreprise) {
+            // Un tuteur a accès si le carnet est lié à une autorisation de pointage pour son entreprise
+            $isLinkedToTutor = \App\Models\AutorisationPointage::where('carnet_id', $carnet->id)
+                ->where('entreprise_id', $user->entreprise->id)
+                ->exists();
+            if ($isLinkedToTutor) return;
+
+            // Compatibilité ancien flux (si entreprise_id encore présent sur le carnet)
+            if ($carnet->entreprise_id !== null && $carnet->entreprise_id === $user->entreprise->id) {
+                return;
+            }
         }
 
         abort(403, "Vous n'avez pas accès à ce carnet.");
@@ -391,10 +398,15 @@ class CarnetController extends Controller
             $moyenne = (int) round($somme / $progressions->count());
         }
 
+        $nbConventions = \App\Models\AutorisationPointage::where('entreprise_id', $entrepriseId)
+            ->where('statut', 'CONVENTION_SIGNEE')
+            ->count();
+
         return response()->json([
             'data' => [
                 'stagiaires_actifs' => $nbActifs,
                 'progression_moyenne' => $moyenne,
+                'conventions_signees' => $nbConventions,
                 'alertes' => $this->detecterInactivite($entrepriseId),
             ]
         ]);
