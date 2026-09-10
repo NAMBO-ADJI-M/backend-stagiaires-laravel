@@ -363,25 +363,23 @@ class AuthController extends Controller
             'notifications_non_lues' => $notifCount,
         ];
 
-        // Pour le stagiaire, on ajoute l'état de l'autorisation pour l'entreprise active
+        // Pour le stagiaire, on ajoute l'état de l'autorisation de pointage (indépendant du carnet)
         if ($user->role === 'stagiaire' && $user->stagiaire) {
-            $carnet = \App\Models\CarnetDeStage::where('stagiaire_id', $user->stagiaire->id)
-                ->where('statut', 'EN_COURS')
+            $auto = \App\Models\AutorisationPointage::where('stagiaire_id', $user->stagiaire->id)
+                ->whereIn('statut', ['CONVENTION_SIGNEE', 'ACTIVE', 'EN_ATTENTE'])
+                ->with('entreprise:id,raison_sociale,heure_fin_journee')
+                ->latest('updated_at')
                 ->first();
 
-            if ($carnet && $carnet->entreprise_id) {
-                $auto = \App\Models\AutorisationPointage::where('stagiaire_id', $user->stagiaire->id)
-                    ->where('entreprise_id', $carnet->entreprise_id)
-                    ->with('entreprise:id,raison_sociale,heure_fin_journee')
-                    ->first();
+            if ($auto) {
                 $data['autorisation_pointage'] = [
-                    'id' => $auto?->id,
-                    'entreprise_id' => $carnet->entreprise_id,
-                    'entreprise_nom' => $carnet->entreprise_nom,
-                    'statut' => $auto ? $auto->statut : 'INACTIVE',
-                    'heure_fin_journee' => $auto?->entreprise?->heure_fin_journee ?? '17:30:00',
-                    'lieu_execution_lat' => $auto?->lieu_execution_lat,
-                    'lieu_execution_lng' => $auto?->lieu_execution_lng,
+                    'id' => $auto->id,
+                    'entreprise_id' => $auto->entreprise_id,
+                    'entreprise_nom' => $auto->entreprise?->raison_sociale,
+                    'statut' => $auto->statut,
+                    'heure_fin_journee' => $auto->entreprise?->heure_fin_journee ?? '17:30:00',
+                    'lieu_execution_lat' => $auto->lieu_execution_lat,
+                    'lieu_execution_lng' => $auto->lieu_execution_lng,
                 ];
             }
         }
