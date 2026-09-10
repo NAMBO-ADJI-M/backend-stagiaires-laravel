@@ -25,76 +25,64 @@
     @if(isset($logo_url) && $logo_url)
         <img src="{{ $logo_url }}" alt="Logo Entreprise" style="max-height: 60px; margin-bottom: 10px;">
     @endif
-    <h1>Convention de Stage Professionnel</h1>
-    <p>StageLink - Plateforme de Suivi et de Certification</p>
+    <h1>CONVENTION DE STAGE PROFESSIONNEL</h1>
+    <p style="font-weight: bold;">Réf : {{ $autorisation->id }}</p>
 </div>
 
 <div class="section">
-    <div class="section-title">1. Cadre Administratif et Légal</div>
-    <div class="row"><span class="label">Entreprise d'accueil :</span> <strong>{{ $autorisation->raison_sociale_custom ?? $entreprise->raison_sociale }}</strong></div>
-    <div class="row"><span class="label">Adresse du siège :</span> {{ $autorisation->adresse_custom ?? $entreprise->adresse_libelle }}</div>
-    <div class="row"><span class="label">Situation géographique :</span> {{ $autorisation->situation_geographique ?? 'N/A' }}</div>
-    <div class="row"><span class="label">Secteur d'activité :</span> {{ $autorisation->secteur_activite_custom ?? $entreprise->secteur }}</div>
+    <div class="section-title">ENTRE LES SOUSSIGNÉS</div>
+    <p><strong>1. L'ENTREPRISE D'ACCUEIL :</strong><br>
+    {{ $autorisation->raison_sociale_custom ?? $entreprise->raison_sociale }}, située au {{ $autorisation->adresse_custom ?? $entreprise->adresse_libelle }}.<br>
+    Représentée par {{ $autorisation->representant_legal_nom ?? 'son représentant légal' }} en qualité de {{ $autorisation->representant_legal_fonction ?? 'N/A' }}.</p>
 
-    <div class="row" style="margin-top: 10px;"><span class="label">Représentant Légal :</span> {{ $autorisation->representant_legal_nom ?? 'Non renseigné' }}</div>
-    <div class="row"><span class="label">Fonction Représentant :</span> {{ $autorisation->representant_legal_fonction ?? 'N/A' }}</div>
-    <div class="row"><span class="label">Contact Représentant :</span> {{ $autorisation->representant_legal_contact ?? 'N/A' }}</div>
+    <p><strong>2. LE STAGIAIRE :</strong><br>
+    M./Mme {{ strtoupper($stagiaire->nom) }} {{ $stagiaire->prenom }}, né(e) le {{ $stagiaire->date_naissance ? $stagiaire->date_naissance->format('d/m/Y') : '—' }}.<br>
+    Demeurant au {{ $autorisation->stagiaire_adresse ?? $stagiaire->domicile_adresse }}.</p>
 
-    <div class="row" style="margin-top: 10px;"><span class="label">Le Stagiaire :</span> <strong>{{ strtoupper($stagiaire->nom) }} {{ $stagiaire->prenom }}</strong></div>
-    <div class="row"><span class="label">Téléphone Stagiaire :</span> {{ $autorisation->stagiaire_telephone ?? $stagiaire->telephone }}</div>
-    <div class="row"><span class="label">Établissement d'étude :</span> {{ $autorisation->etablissement_nom ?? $stagiaire->ecole }}</div>
-    <div class="row"><span class="label">Année académique :</span> {{ $autorisation->stagiaire_annee_academique ?? 'N/A' }}</div>
-    <div class="row"><span class="label">Objet du stage :</span> {{ $autorisation->objet_stage }}</div>
-    <div class="row"><span class="label">Cursus de rattachement :</span> {{ $autorisation->cursus_rattachement }}</div>
+    <p><strong>3. L'ÉTABLISSEMENT D'ENSEIGNEMENT :</strong><br>
+    {{ $autorisation->etablissement_nom ?? $stagiaire->ecole }}.<br>
+    Cursus : {{ $autorisation->cursus_rattachement }}.</p>
 </div>
 
 <div class="section">
-    <div class="section-title">2. Durée et Lieu</div>
-    <div class="row"><span class="label">Période :</span> Du {{ $autorisation->date_debut }} au {{ $autorisation->date_fin }}</div>
-    <div class="row"><span class="label">Lieu d'exécution :</span> {{ $autorisation->lieu_execution }}</div>
+    <div class="section-title">ARTICLE 1 : OBJET DE LA CONVENTION</div>
+    <p>La présente convention règle les rapports de l'entreprise d'accueil avec l'établissement d'enseignement et le stagiaire.<br>
+    Le stage a pour objet : <strong>{{ $autorisation->objet_stage }}</strong>.<br>
+    Les missions confiées sont : {{ $autorisation->poste }}.</p>
 </div>
 
 <div class="section">
-    <div class="section-title">3. Conditions Matérielles</div>
-    <div class="row"><span class="label">Durée hebdomadaire :</span> {{ $autorisation->duree_hebdomadaire }}</div>
-    <div class="row"><span class="label">Jours de présence :</span> {{ is_array($autorisation->jours_presence) ? implode(', ', $autorisation->jours_presence) : $autorisation->jours_presence }}</div>
-    <div class="row"><span class="label">Modalités de télétravail :</span> {{ $autorisation->teletravail_modalites }}</div>
+    <div class="section-title">ARTICLE 2 : DURÉE ET VOLUME HORAIRE</div>
+    <p>Le stage se déroulera du <strong>{{ $autorisation->date_debut->format('d/m/Y') }}</strong> au <strong>{{ $autorisation->date_fin->format('d/m/Y') }}</strong>.<br>
+    La durée hebdomadaire est fixée à {{ $autorisation->duree_hebdomadaire }} heures.</p>
+</div>
 
-    <div class="row" style="margin-top: 10px;"><span class="label">Gratification :</span>
-        @if($autorisation->gratification_prevue)
-            {{ $autorisation->gratification_montant }} € (Périodicité : {{ $autorisation->gratification_periodicite }})
-        @else
-            Sans gratification
-        @endif
-    </div>
+<div class="section">
+    <div class="section-title">ARTICLE 3 : MODALITÉS D'EXÉCUTION</div>
+    <p>Le lieu d'exécution du stage est : {{ $autorisation->lieu_execution }}.<br>
+    Jours de présence : {{ is_array($autorisation->jours_presence) ? implode(', ', $autorisation->jours_presence) : $autorisation->jours_presence }}.<br>
+    Modalités de télétravail : {{ $autorisation->teletravail_modalites ?? 'Non prévu' }}.</p>
+</div>
 
-    @if($autorisation->conges_absences)
-        <div class="row"><span class="label">Congés et absences :</span></div>
-        <div class="content"><em>{{ $autorisation->conges_absences }}</em></div>
+<div class="section">
+    <div class="section-title">ARTICLE 4 : GRATIFICATION ET AVANTAGES</div>
+    <p>@if($autorisation->gratification_prevue)
+        Le stagiaire percevra une gratification de <strong>{{ $autorisation->gratification_montant }} €</strong> payée selon une périodicité {{ $autorisation->gratification_periodicite }}.
+    @else
+        Le stage n'est pas assorti d'une gratification financière.
     @endif
-
-    @if($autorisation->conditions_stage)
-        <div class="row"><span class="label">Autres avantages :</span></div>
-        <div class="content"><em>{{ $autorisation->conditions_stage }}</em></div>
-    @endif
+    <br>Autres avantages : {{ $autorisation->conditions_stage ?? 'Néant' }}.</p>
 </div>
 
 <div class="section">
-    <div class="section-title">4. Encadrement et Suivi</div>
-    <div class="row"><span class="label">Maître de stage (Tuteur) :</span> <strong>{{ $autorisation->tuteur_nom ?? $autorisation->tuteur_designe }} {{ $autorisation->tuteur_prenom }}</strong></div>
-    <div class="row"><span class="label">Fonction Tuteur :</span> {{ $autorisation->tuteur_fonction }}</div>
-    <div class="row"><span class="label">Email Tuteur :</span> {{ $autorisation->tuteur_email }}</div>
-    <div class="row"><span class="label">Téléphone Tuteur :</span> {{ $autorisation->tuteur_telephone }}</div>
-
-    @if($autorisation->modalites_suivi_detail)
-        <div class="row"><span class="label">Détail du suivi :</span></div>
-        <div class="content">{{ $autorisation->modalites_suivi_detail }}</div>
-    @endif
+    <div class="section-title">ARTICLE 5 : ENCADREMENT ET SUIVI NUMÉRIQUE</div>
+    <p>Le stagiaire est encadré par <strong>{{ $autorisation->tuteur_nom ?? $autorisation->tuteur_designe }} {{ $autorisation->tuteur_prenom }}</strong>.<br>
+    Le suivi de l'assiduité est certifié par l'application <strong>StageLink</strong> via un système de pointage GPS automatique accepté par les parties.</p>
 </div>
 
 <div class="section">
-    <div class="section-title">5. Engagement Numérique et Pointage</div>
-    <p>Les parties acceptent l'usage de l'application StageLink pour certifier la présence effective du stagiaire sur le lieu d'exécution via le système de pointage GPS automatique.</p>
+    <div class="section-title">ARTICLE 6 : ASSURANCES ET RESPONSABILITÉ</div>
+    <p>L'entreprise et le stagiaire déclarent être couverts par une assurance responsabilité civile pour toute la durée du stage.</p>
 </div>
 
 <table class="signature-box">

@@ -95,6 +95,33 @@ class CarnetController extends Controller
     }
 
     /**
+     * Détails d'un carnet spécifique.
+     */
+    public function show(Request $request, string $id)
+    {
+        $carnet = CarnetDeStage::with(['stagiaire', 'entreprise', 'convention', 'indicateurAssiduite'])->findOrFail($id);
+        $this->autoriserAccesCarnet($request, $carnet);
+
+        return response()->json(['data' => $carnet]);
+    }
+
+    /**
+     * Liste des compétences liées au métier du stage.
+     */
+    public function competences(Request $request, string $id)
+    {
+        $carnet = CarnetDeStage::findOrFail($id);
+        $this->autoriserAccesCarnet($request, $carnet);
+
+        // On récupère les compétences liées au métier (ou au domaine si métier non précisé)
+        $competences = \App\Models\Competence::where('metier_id', $carnet->metier_id)
+            ->orWhere('domaine_id', $carnet->domaine_id)
+            ->get();
+
+        return response()->json(['data' => $competences]);
+    }
+
+    /**
      * Liste les carnets du stagiaire connecté.
      * Chaque carnet inclut les coordonnées de geofencing à surveiller :
      * priorité au lieu de stage précis saisi par le stagiaire

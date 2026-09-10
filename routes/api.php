@@ -122,6 +122,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('documents/liaison/{autorisationId}/convention-pdf', [DocumentController::class, 'genererConvention']);
     Route::get('documents/liaison/{autorisationId}/convention-apercu', [DocumentController::class, 'getApercuConvention']);
 
+    // Routes partagées Carnet (contrôlées par autoriserAccesCarnet)
+    Route::prefix('carnets/{id}')->group(function () {
+        Route::get('/', [CarnetController::class, 'show']);
+        Route::get('entrees', [CarnetController::class, 'entrees']);
+        Route::get('encouragements', [CarnetController::class, 'encouragements']);
+        Route::get('competences', [CarnetController::class, 'competences']);
+        Route::get('stats', [CarnetController::class, 'stats']);
+    });
+
     Route::middleware('profil:entreprise')->group(function () {
         Route::post('entreprise/profil', [AuthController::class, 'completeEntrepriseProfile']);
         Route::prefix('fiches-invitation')->group(function () {
